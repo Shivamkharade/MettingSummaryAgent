@@ -1,32 +1,64 @@
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from pathlib import Path
 import time
 
-WATCH_FOLDER = r"C:\\Users\\SKharade\\Projects and Learning\\C_TEST_RECORDING"
+# Import your compiled LangGraph
+from Metting_agent import graph
+
+WATCH_FOLDER = r"C:\Users\SKharade\Projects and Learning\C_TEST_RECORDING\New folder"
 
 class MyHandler(FileSystemEventHandler):
 
     def on_created(self, event):
 
+        # Ignore folders
         if event.is_directory:
             return
 
-        print("New file:", event.src_path)
+        file_path = Path(event.src_path)
 
-        # Trigger your LangGraph
-        process_file(event.src_path)
+        # Process only meeting recordings
+        if file_path.suffix.lower() not in [
+            ".mp4",
+            ".wav",
+            ".mp3",
+            ".mkv",
+            ".mov"
+        ]:
+            return
+
+        print("=" * 60)
+        print("New meeting detected")
+        print(file_path)
+        print("=" * 60)
+
+        process_file(str(file_path))
 
 
-def process_file(path):
-    print("Running LangGraph for:", path)
+def process_file(path: str):
 
-    # graph.invoke(...)
-    # pass file path to your graph
+    print(f"Running Meeting Agent for:\n{path}")
+
+    try:
+
+        result = graph.invoke(
+            {
+                "video_path": path
+            }
+        )
+
+        print("\nMeeting processing completed successfully.")
+
+    except Exception as e:
+        print(f"\nError while processing meeting:\n{e}")
 
 
 observer = Observer()
 observer.schedule(MyHandler(), WATCH_FOLDER, recursive=False)
 observer.start()
+
+print(f"Watching folder:\n{WATCH_FOLDER}")
 
 try:
     while True:
