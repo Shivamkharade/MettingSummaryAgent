@@ -32,7 +32,7 @@ def get_output_directory(video_path: str) -> Path:
     ├── Meetings/
     │     meeting.mp4
     │
-    └── Summary/
+    └── Meetings_Summary/
           meeting/
     """
 
@@ -45,7 +45,7 @@ def get_output_directory(video_path: str) -> Path:
     project_root = meetings_folder.parent
 
     # Meeting_Agent/Summary
-    summary_root = project_root / "Summary"
+    summary_root = project_root / "Meetings_Summary"
 
     # Meeting_Agent/Summary/<meeting_name>
     meeting_folder = summary_root / video.stem
@@ -117,14 +117,16 @@ def save_text_file(video_path: str, filename: str, content: Any) -> Path:
     return file_path
 
 def transcript_node(state: MeetingState):
-    
+    print("enterd transcript node")
     client = genai.Client(api_key=api_key_google)
 
     video_path = state["video_path"]
 
     # Upload video
     video = client.files.upload(file=video_path)
-
+    
+    print("video is uploaded")
+    
     # Wait until Google finishes processing
     while True:
         video = client.files.get(name=video.name)
@@ -136,7 +138,8 @@ def transcript_node(state: MeetingState):
             raise RuntimeError("Video processing failed.")
 
         time.sleep(5)
-
+    
+    print("generating transcript started")
     # Generate transcript
     response = client.models.generate_content(
         model="gemini-flash-latest",
@@ -155,20 +158,22 @@ def transcript_node(state: MeetingState):
     )
 
     transcript = response.text
-
+    
+    print("transcripted generated and saved exited transcript node")
     # Save transcript
     save_text_file(
     state["video_path"],
     "transcript.txt",
     transcript
     )
-
+    
     return {
         "transcript": transcript
     }
     
 def summary_node(state: MeetingState):
-
+    
+    print("entered summary_node")
     transcript = state["transcript"]
     
     SUMMARY_PROMPT = PromptTemplate(
@@ -211,13 +216,14 @@ def summary_node(state: MeetingState):
     "summary.txt",
     summary
     )
-
+    
+    print("exited summary node and saved the summary")
     return {
         "summary": summary
     }
 
 def action_items(state:MeetingState):
-    
+    print("entered action items node")
     transcript = state['transcript']
     
     ACTION_ITEMS_PROMPT =PromptTemplate( 
@@ -272,6 +278,8 @@ def action_items(state:MeetingState):
     "action_items.txt",
     action_items_text
     )
+    
+    print("exited action_items node and saved action items ")
 
     return {
         "action_items": action_items_text
@@ -299,7 +307,7 @@ def notification_node(state: MeetingState):
             }
         ]
     )
-
+    print("sent the window notification")
     return {}
 
 # graph building
