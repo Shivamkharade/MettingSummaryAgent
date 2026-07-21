@@ -380,7 +380,7 @@ GOOGLE_API_KEY=YOUR_API_KEY
 Open:
 
 ```
-test.py
+watcher.py
 ```
 
 Modify:
