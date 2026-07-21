@@ -8,7 +8,7 @@ from langgraph.types import Send
 from dotenv import load_dotenv
 from typing import TypedDict,Optional,Annotated
 from pathlib import Path
-from Metting_agent import save_text_file,get_output_directory
+from utils import save_text_file,get_output_directory
 import os
 import time
 import operator
@@ -382,17 +382,3 @@ transcript_builder.add_edge(
 
 # Compile
 transcript_graph = transcript_builder.compile()
-
-
-
-if __name__ == "__main__":
-    test_state: TranscriptState = {
-    "video_path": r"C:\Users\SKharade\Projects and Learning\C_TEST_RECORDING\New folder\videoplayback.mp4",
-    "chunks": [],
-    "transcripts": [],
-    "transcript": None,
-    }
-    
-    transcript_graph.invoke(test_state)
-    
-    

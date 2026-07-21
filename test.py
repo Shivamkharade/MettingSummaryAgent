@@ -32,6 +32,9 @@ class MyHandler(FileSystemEventHandler):
         print("New meeting detected")
         print(file_path)
         print("=" * 60)
+        
+        print("Waiting 10 seconds for the file to finish copying...")
+        time.sleep(10)
 
         process_file(str(file_path))
 
