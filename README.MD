@@ -1,6 +1,6 @@
 # 🎥 AI Meeting Assistant
 
-An AI-powered meeting assistant built using **LangGraph**, **Google Gemini**, and **Python** that automatically watches a folder for new meeting recordings, generates a transcript, summarizes the discussion, extracts action items, and saves the results in a structured format.
+An AI-powered meeting assistant built using **LangGraph**, **Google Gemini**, and **Python** that automatically watches a folder for new meeting recordings, generates a verbatim transcript, summarizes the discussion, extracts action items, and saves the results in a structured format.
 
 ---
 
@@ -49,17 +49,16 @@ An AI-powered meeting assistant built using **LangGraph**, **Google Gemini**, an
 
 # Transcript Graph
 
-The transcript generation itself is implemented as a **subgraph**.
+The transcript generation is implemented as a dedicated **LangGraph subgraph**.
 
 ```
 START
    │
 route_video
    │
-   ├───────────────► transcript_node
+   ├──────────────► transcript_node
    │
-   │
-   └───────────────► split_video_node
+   └──────────────► split_video_node
                            │
                            ▼
                      Fan-Out (Send)
@@ -85,16 +84,16 @@ Videos are classified into two categories.
 
 ## Short Videos
 
-- ≤ 50 minutes
-- Uploaded directly to Gemini
-- Single transcript generated
+- Duration ≤ 50 minutes
+- Uploaded directly to Google Gemini
+- Transcript generated in a single request
 
 ## Long Videos
 
-- > 50 minutes
+- Duration > 50 minutes
 - Split into 45-minute chunks using FFmpeg
-- Chunks processed in parallel
-- Individual transcripts merged in chronological order
+- Chunks processed in parallel using LangGraph Fan-Out
+- Individual transcripts merged back together in the correct order
 
 ---
 
@@ -141,26 +140,19 @@ Meetings_Summary/
 
 ```
 START
-
-↓
-
+   │
+   ▼
 Transcript Subgraph
-
-↓
-
-Summary
-
-↓
-
-Action Items
-
-↓
-
-Notification
-
-↓
-
-END
+   │
+   ├────────► Summary
+   │
+   └────────► Action Items
+                │
+                ▼
+          Notification
+                │
+                ▼
+               END
 ```
 
 ---
@@ -171,13 +163,11 @@ END
 
 ```
 START
-
-↓
-
+   │
+   ▼
 Transcript
-
-↓
-
+   │
+   ▼
 END
 ```
 
@@ -185,29 +175,23 @@ END
 
 ```
 START
-
-↓
-
+   │
+   ▼
 Split Video
-
-↓
-
+   │
+   ▼
 Fan-Out
-
-↓
-
+   │
+   ▼
 Chunk Workers
-
-↓
-
+   │
+   ▼
 Fan-In
-
-↓
-
+   │
+   ▼
 Merge Transcript
-
-↓
-
+   │
+   ▼
 END
 ```
 
@@ -215,24 +199,28 @@ END
 
 # Folder Monitoring
 
-The project continuously watches a folder using **Watchdog**.
+The project continuously monitors a folder using **Watchdog**.
 
 Whenever a new meeting recording is detected:
 
 1. Waits briefly for the file copy to finish.
 2. Starts the Meeting Agent.
-3. Generates all outputs.
-4. Sends a desktop notification.
+3. Generates:
+   - Transcript
+   - Summary
+   - Action Items
+4. Saves the generated files.
+5. Sends a Windows desktop notification.
 
 ---
 
 # Generated Files
 
-For every meeting the project generates:
+For every meeting recording the following files are generated:
 
-- transcript.txt
-- summary.txt
-- action_items.txt
+- `transcript.txt`
+- `summary.txt`
+- `action_items.txt`
 
 ---
 
@@ -240,21 +228,146 @@ For every meeting the project generates:
 
 The project includes:
 
-- Retry mechanism for temporary Gemini 503 errors.
-- Parallel worker isolation.
-- Automatic transcript merging.
+- Automatic retry for temporary Gemini API (503) errors.
+- Parallel chunk processing.
+- Transcript merging after all workers complete.
 - Video duration validation using FFprobe.
-- Separate processing paths for short and long recordings.
+- Separate execution paths for short and long videos.
 
 ---
 
-# Requirements
+# Prerequisites
 
-- Python 3.11+
-- FFmpeg installed and added to PATH
-- Google Gemini API Key
+Before running the project, ensure the following software is installed.
 
-Create a `.env` file:
+## 1. Install Python
+
+Download Python 3.11 or later from:
+
+https://www.python.org/downloads/
+
+Verify the installation:
+
+```bash
+python --version
+```
+
+---
+
+## 2. Install FFmpeg
+
+Download FFmpeg from:
+
+https://www.gyan.dev/ffmpeg/builds/
+
+Download the **Essentials Build** ZIP file.
+
+Extract it to a location such as:
+
+```
+C:\ffmpeg
+```
+
+The folder structure should look like:
+
+```
+C:\ffmpeg
+│
+└── bin
+     │
+     ├── ffmpeg.exe
+     ├── ffprobe.exe
+     └── ffplay.exe
+```
+
+---
+
+### Add FFmpeg to Windows PATH
+
+1. Press **Windows Key**
+2. Search for **Environment Variables**
+3. Open **Edit the system environment variables**
+4. Click **Environment Variables**
+5. Under **System Variables**, select **Path**
+6. Click **Edit**
+7. Click **New**
+8. Add:
+
+```
+C:\ffmpeg\bin
+```
+
+9. Click **OK** on all windows.
+
+Restart your terminal.
+
+Verify the installation:
+
+```bash
+ffmpeg -version
+```
+
+and
+
+```bash
+ffprobe -version
+```
+
+Both commands should print the installed version.
+
+---
+
+## 3. Create a Google Gemini API Key
+
+Create a free API key from:
+
+https://aistudio.google.com/app/apikey
+
+---
+
+## 4. Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/AI-Meeting-Assistant.git
+
+cd AI-Meeting-Assistant
+```
+
+---
+
+## 5. Create a Virtual Environment
+
+Windows
+
+```bash
+python -m venv venv
+```
+
+Activate it:
+
+```bash
+venv\Scripts\activate
+```
+
+---
+
+## 6. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 7. Configure Environment Variables
+
+Create a file named:
+
+```
+.env
+```
+
+Add your Gemini API key:
 
 ```env
 GOOGLE_API_KEY=YOUR_API_KEY
@@ -262,29 +375,46 @@ GOOGLE_API_KEY=YOUR_API_KEY
 
 ---
 
-# Install
+## 8. Configure the Watch Folder
 
-```bash
-git clone https://github.com/yourusername/AI-Meeting-Assistant.git
+Open:
 
-cd AI-Meeting-Assistant
+```
+test.py
+```
 
-pip install -r requirements.txt
+Modify:
+
+```python
+WATCH_FOLDER = r"YOUR_MEETING_FOLDER"
+```
+
+Example:
+
+```python
+WATCH_FOLDER = r"C:\Meetings"
 ```
 
 ---
 
-# Run
+# Run the Project
 
-Start the folder watcher:
+Start the watcher:
 
 ```bash
 python watcher.py
 ```
 
-Drop a meeting recording into the watched folder.
+Now copy or move a meeting recording into the configured watch folder.
 
-The assistant automatically processes the recording.
+The Meeting Assistant will automatically:
+
+- Detect the new recording
+- Generate a transcript
+- Generate a summary
+- Extract action items
+- Save the generated files
+- Display a Windows notification
 
 ---
 
@@ -293,18 +423,18 @@ The assistant automatically processes the recording.
 - Speaker diarization
 - Meeting minutes generation
 - PDF report generation
-- Email delivery of meeting summary
+- Email delivery
 - Calendar integration
 - Cloud storage support
 - Vector database for meeting search
 - RAG over previous meetings
 - Multi-language transcript export
-- Web dashboard using Streamlit
+- Streamlit web dashboard
 
 ---
 
 # Author
 
-Shivam Kharade
+**Shivam Kharade**
 
-Built using LangGraph, Google Gemini and Python.
+Built using **LangGraph**, **Google Gemini**, **LangChain**, and **Python**.
