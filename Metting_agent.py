@@ -142,7 +142,7 @@ def transcript_node(state: MeetingState):
     print("generating transcript started")
     # Generate transcript
     response = client.models.generate_content(
-        model="gemini-flash-latest",
+        model="gemini-2.5-flash",
         contents=[
             video,
             """
@@ -182,6 +182,11 @@ def summary_node(state: MeetingState):
 
         Analyze the following meeting transcript and generate a well-structured summary.
 
+        IMPORTANT:
+        - ALWAYS generate the summary in English, regardless of the language of the meeting transcript.
+        - If the transcript is in any language other than English, first understand its content and then produce the summary in clear, professional English.
+        - Do NOT mix languages in the output. The final summary must be entirely in English.
+
         Your summary should contain the following sections:
 
         ## Meeting Overview
@@ -200,8 +205,8 @@ def summary_node(state: MeetingState):
 
         {transcript}
         """,
-        input_variables= ['transcript']
-        )
+        input_variables=["transcript"]
+    )
 
     chain = SUMMARY_PROMPT | llm
 
@@ -226,11 +231,16 @@ def action_items(state:MeetingState):
     print("entered action items node")
     transcript = state['transcript']
     
-    ACTION_ITEMS_PROMPT =PromptTemplate( 
+    ACTION_ITEMS_PROMPT = PromptTemplate(
         template="""
         You are a professional meeting assistant.
 
         Analyze the following meeting transcript and identify all action items.
+
+        IMPORTANT:
+        - ALWAYS generate the action items in English, regardless of the language of the meeting transcript.
+        - If the transcript is in any language other than English, first understand its content and then produce the action items in clear, professional English.
+        - Do NOT mix languages in the output. The final output must be entirely in English.
 
         For each action item, include:
 
@@ -238,7 +248,7 @@ def action_items(state:MeetingState):
         - Task
         - Deadline (if mentioned)
 
-        Format your response like this:
+        Format your response exactly like this:
 
         1.
         Assignee:
@@ -258,7 +268,7 @@ def action_items(state:MeetingState):
 
         {transcript}
         """,
-        input_variables=['transcript']
+        input_variables=["transcript"]
     )
     
     
