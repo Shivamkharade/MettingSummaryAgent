@@ -1,5 +1,4 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
-from google import genai
 from langchain_core.prompts import PromptTemplate
 
 from langgraph.graph import StateGraph, START ,END
@@ -7,11 +6,10 @@ from video_tanscript_generate import transcript_graph
 from utils import get_output_directory,save_text_file,extract_text
 
 from dotenv import load_dotenv
-from typing import TypedDict,Optional,Any
+from typing import TypedDict,Optional
 from pathlib import Path
 import os
 from win11toast import toast
-import time
 
 load_dotenv(".env")
 api_key_google = os .getenv("GOOGLE_API_KEY")
