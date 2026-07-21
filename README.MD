@@ -279,7 +279,7 @@ pip install -r requirements.txt
 Start the folder watcher:
 
 ```bash
-python test.py
+python watcher.py
 ```
 
 Drop a meeting recording into the watched folder.
