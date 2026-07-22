@@ -415,24 +415,6 @@ The application includes several reliability features.
 
 ---
 
-# Future Improvements
-
-- Speaker diarization
-- Timestamped transcripts
-- PDF meeting reports
-- Email delivery
-- Microsoft Teams integration
-- Google Meet integration
-- Calendar integration
-- Search previous meetings
-- Vector Database
-- RAG over meeting history
-- Meeting analytics dashboard
-- Docker support
-- Cloud storage integration
-
----
-
 # Learning Highlights
 
 This project demonstrates practical experience with
