@@ -437,4 +437,4 @@ This project demonstrates practical experience with
 
 **Shivam Kharade**
 
-Built with ❤️ using Python, LangGraph, LangChain, Google Gemini, and CustomTkinter.
+Built with Python, LangGraph, LangChain, Google Gemini, and CustomTkinter.
