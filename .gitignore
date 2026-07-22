@@ -43,3 +43,7 @@ htmlcov/
 # OS files
 .DS_Store
 Thumbs.db
+
+what_could_go_wrong.txt
+MeetingAgent.spec
+image.png
