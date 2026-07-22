@@ -1,35 +1,34 @@
 from pathlib import Path
 from typing import Any
+from google import genai
+from langchain_google_genai import ChatGoogleGenerativeAI
+import json
+
+
+CONFIG_FILE = Path("config.json")
 
 def get_output_directory(video_path: str) -> Path:
-    """
-    Creates the following structure:
 
-    Meeting_Agent/
-    ├── Meetings/
-    │     meeting.mp4
-    │
-    └── Meetings_Summary/
-          meeting/
-    """
+    config = load_config()
+
+    output_folder = config.get("output_folder", "")
+
+    if not output_folder:
+        raise ValueError("Output folder is not configured.")
+
+    output_root = Path(output_folder)
 
     video = Path(video_path)
 
-    # Meeting_Agent/Meetings
-    meetings_folder = video.parent
+    meeting_folder = output_root / video.stem
 
-    # Meeting_Agent
-    project_root = meetings_folder.parent
-
-    # Meeting_Agent/Summary
-    summary_root = project_root / "Meetings_Summary"
-
-    # Meeting_Agent/Summary/<meeting_name>
-    meeting_folder = summary_root / video.stem
-
-    meeting_folder.mkdir(parents=True, exist_ok=True)
+    meeting_folder.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
     return meeting_folder
+
 
 def extract_text(response):
 
@@ -90,3 +89,38 @@ def save_text_file(video_path: str, filename: str, content: Any) -> Path:
     file_path.write_text(text, encoding="utf-8")
 
     return file_path
+
+def load_config():
+
+    if not CONFIG_FILE.exists():
+        return {
+            "api_key": "",
+            "meeting_folder": "",
+            "output_folder": ""
+        }
+
+    with open(CONFIG_FILE, "r") as file:
+        return json.load(file)
+
+
+def save_config(settings):
+
+    with open(CONFIG_FILE, "w") as file:
+        json.dump(settings, file, indent=4)
+
+def get_api_key() -> str:
+
+    api_key = load_config().get("api_key", "").strip()
+
+    print(f"Loaded API Key: {api_key}")
+
+    return api_key
+
+def get_gemini_client():
+    return genai.Client(api_key=get_api_key())
+
+def get_llm():
+    return ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        google_api_key=get_api_key()
+    )

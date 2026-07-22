@@ -1,20 +1,17 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import PromptTemplate
-
 from langgraph.graph import StateGraph, START ,END
 from video_tanscript_generate import transcript_graph
-from utils import get_output_directory,save_text_file,extract_text
-
-from dotenv import load_dotenv
+from utils import (
+    get_output_directory,
+    save_text_file,
+    extract_text,
+    get_llm,
+)
 from typing import TypedDict,Optional
 from pathlib import Path
-import os
 from win11toast import toast
 
-load_dotenv(".env")
-api_key_google = os .getenv("GOOGLE_API_KEY")
 
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 
 class MeetingState(TypedDict):
     video_path: str
@@ -72,7 +69,7 @@ def summary_node(state: MeetingState):
         """,
         input_variables=["transcript"]
     )
-
+    llm = get_llm()
     chain = SUMMARY_PROMPT | llm
 
     response = chain.invoke({
@@ -136,6 +133,7 @@ def action_items(state:MeetingState):
         input_variables=["transcript"]
     )
     
+    llm = get_llm()
     
     action_items_chain = ACTION_ITEMS_PROMPT | llm
     

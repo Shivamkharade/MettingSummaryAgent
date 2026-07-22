@@ -1,25 +1,17 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
-from google import genai
 from google.genai.errors import ServerError
-
 from langgraph.graph import StateGraph, START ,END
 from langgraph.types import Send
-
-from dotenv import load_dotenv
 from typing import TypedDict,Optional,Annotated
-from utils import save_text_file,get_output_directory
-import os
+from utils import (
+    save_text_file,
+    get_output_directory,
+    get_gemini_client,
+)
 import time
 import operator
 import subprocess
 import json
 
-
-load_dotenv(".env")
-api_key_google = os .getenv("GOOGLE_API_KEY")
-
-llm = ChatGoogleGenerativeAI(model='gemini-2.5-flash')
-client = genai.Client(api_key=api_key_google)
 
 class ChunkTranscript(TypedDict):
     chunk_number: int
@@ -95,7 +87,8 @@ def route_video(state: TranscriptState) -> str:
 
 def transcript_node(state: TranscriptState):
     print("enterd transcript node")
-
+    
+    client = get_gemini_client()
     video_path = state["video_path"]
 
     # Upload video
@@ -241,7 +234,7 @@ def fan_out_chunks(state: TranscriptState):
     return sends
 
 def transcribe_chunk_node(state: ChunkWorkerState):
-
+    client = get_gemini_client()
     chunk_path = state["chunk_path"]
     chunk_number = state["chunk_number"]
 

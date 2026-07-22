@@ -6,7 +6,8 @@ import time
 # Import your compiled LangGraph
 from Metting_agent import graph
 
-WATCH_FOLDER = r"C:\Users\SKharade\Projects and Learning\C_TEST_RECORDING\New folder"
+observer = None
+# WATCH_FOLDER = r"C:\Users\SKharade\Projects and Learning\C_TEST_RECORDING\New folder"
 
 class MyHandler(FileSystemEventHandler):
 
@@ -57,17 +58,34 @@ def process_file(path: str):
         print(f"\nError while processing meeting:\n{e}")
 
 
-observer = Observer()
-observer.schedule(MyHandler(), WATCH_FOLDER, recursive=False)
-observer.start()
+def start_watchdog(folder_path):
 
-print(f"Watching folder:\n{WATCH_FOLDER}")
+    global observer
 
-try:
-    while True:
-        time.sleep(1)
+    observer = Observer()
 
-except KeyboardInterrupt:
-    observer.stop()
+    observer.schedule(
+        MyHandler(),
+        folder_path,
+        recursive=False
+    )
 
-observer.join()
+    observer.start()
+
+    print(f"Watching folder:\n{folder_path}")
+
+    try:
+        while observer.is_alive():
+            time.sleep(1)
+
+    finally:
+        observer.stop()
+        observer.join()
+        print("Monitoring Stopped")
+
+def stop_watchdog():
+
+    global observer
+
+    if observer is not None:
+        observer.stop()
