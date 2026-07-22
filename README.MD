@@ -1,24 +1,29 @@
 # 🎥 AI Meeting Assistant
 
-An AI-powered meeting assistant built using **LangGraph**, **Google Gemini**, and **Python** that automatically watches a folder for new meeting recordings, generates a verbatim transcript, summarizes the discussion, extracts action items, and saves the results in a structured format.
+An AI-powered desktop application that automatically monitors a folder for new meeting recordings, generates a verbatim transcript using Google Gemini, summarizes the meeting, extracts action items, and organizes all outputs into meeting-specific folders.
+
+The project is built using **Python**, **LangGraph**, **LangChain**, **Google Gemini**, and **CustomTkinter**, demonstrating graph-based AI workflows, parallel processing, desktop GUI development, and automation.
 
 ---
 
 # Features
 
 - 📁 Automatically monitors a folder for new meeting recordings.
-- 🎥 Supports:
+- 🎥 Supports multiple media formats:
   - MP4
   - MKV
   - MOV
   - MP3
   - WAV
 - ✍️ Generates a complete verbatim transcript.
-- 📝 Creates a concise meeting summary.
-- ✅ Extracts action items with assignee and deadlines.
-- 🔔 Sends a Windows notification when processing completes.
+- 📝 Produces a professional meeting summary.
+- ✅ Extracts action items with assignee and deadline (if mentioned).
+- 🔀 Automatically splits long meetings into smaller chunks.
+- ⚡ Parallel transcription using LangGraph Fan-Out / Fan-In.
 - 📂 Organizes outputs into meeting-specific folders.
-- ⚡ Parallel transcription for long meetings using LangGraph Fan-Out/Fan-In architecture.
+- 💾 Saves configuration using `config.json`.
+- 🖥️ Simple desktop GUI built with CustomTkinter.
+- 🔔 Windows desktop notification after processing.
 - 🔁 Automatic retry for temporary Gemini API failures.
 
 ---
@@ -26,111 +31,30 @@ An AI-powered meeting assistant built using **LangGraph**, **Google Gemini**, an
 # Project Architecture
 
 ```
-                   Watchdog
-                      │
-                      ▼
-              New Meeting File
-                      │
-                      ▼
-               Meeting Graph
-                      │
-      ┌───────────────┴───────────────┐
-      ▼                               ▼
- Transcript Graph                Summary Node
-      │                               │
-      │                         Action Items Node
-      │                               │
-      └───────────────┬───────────────┘
-                      ▼
-              Notification Node
+                          CustomTkinter GUI
+                                  │
+                                  ▼
+                            config.json
+                                  │
+                                  ▼
+                             Watchdog
+                                  │
+                    Detect New Meeting Recording
+                                  │
+                                  ▼
+                        LangGraph Main Workflow
+                                  │
+        ┌─────────────────────────┼─────────────────────────┐
+        ▼                         ▼                         ▼
+ Transcript Subgraph         Summary Node          Action Items Node
+        │                         │                         │
+        └───────────────┬─────────┴───────────────┬─────────┘
+                        ▼                         ▼
+                  Notification Node
+                        │
+                        ▼
+                       END
 ```
-
----
-
-# Transcript Graph
-
-The transcript generation is implemented as a dedicated **LangGraph subgraph**.
-
-```
-START
-   │
-route_video
-   │
-   ├──────────────► transcript_node
-   │
-   └──────────────► split_video_node
-                           │
-                           ▼
-                     Fan-Out (Send)
-                           │
-          ┌────────┬────────┬────────┐
-          ▼        ▼        ▼        ▼
-     transcribe_chunk_node
-          ▼        ▼        ▼        ▼
-          └────────┴────────┴────────┘
-                    Fan-In
-                      │
-                      ▼
-             merge_transcripts_node
-                      │
-                     END
-```
-
----
-
-# Long Video Processing
-
-Videos are classified into two categories.
-
-## Short Videos
-
-- Duration ≤ 50 minutes
-- Uploaded directly to Google Gemini
-- Transcript generated in a single request
-
-## Long Videos
-
-- Duration > 50 minutes
-- Split into 45-minute chunks using FFmpeg
-- Chunks processed in parallel using LangGraph Fan-Out
-- Individual transcripts merged back together in the correct order
-
----
-
-# Output Structure
-
-```
-Meetings/
-│
-├── TeamMeeting.mp4
-├── SprintReview.mp4
-
-Meetings_Summary/
-│
-├── TeamMeeting/
-│      transcript.txt
-│      summary.txt
-│      action_items.txt
-│
-└── SprintReview/
-       transcript.txt
-       summary.txt
-       action_items.txt
-```
-
----
-
-# Technologies Used
-
-- Python
-- LangGraph
-- LangChain
-- Google Gemini 2.5 Flash
-- Google GenAI SDK
-- FFmpeg
-- FFprobe
-- Watchdog
-- Windows Toast Notifications
 
 ---
 
@@ -147,34 +71,42 @@ Transcript Subgraph
    ├────────► Summary
    │
    └────────► Action Items
-                │
-                ▼
-          Notification
-                │
-                ▼
-               END
+                    │
+                    ▼
+            Notification
+                    │
+                    ▼
+                   END
 ```
 
 ---
 
 ## Transcript Subgraph
 
-### Short Video
+Before generating a transcript, the application checks the meeting duration.
+
+### Short Meeting
 
 ```
 START
    │
+Route Video
+   │
    ▼
-Transcript
+Transcript Node
    │
    ▼
 END
 ```
 
-### Long Video
+---
+
+### Long Meeting
 
 ```
 START
+   │
+Route Video
    │
    ▼
 Split Video
@@ -182,150 +114,63 @@ Split Video
    ▼
 Fan-Out
    │
-   ▼
-Chunk Workers
-   │
-   ▼
-Fan-In
-   │
-   ▼
-Merge Transcript
-   │
-   ▼
-END
+   ├────────────┐
+   ▼            ▼
+Chunk 1     Chunk 2     Chunk 3 ...
+   │            │
+   ▼            ▼
+Transcribe  Transcribe  Transcribe
+   │            │
+   └──────┬─────┘
+          ▼
+     Merge Transcript
+          │
+          ▼
+         END
 ```
+
+Long meetings are automatically divided into **45-minute chunks**, processed in parallel, and merged back together in the correct order.
 
 ---
 
-# Folder Monitoring
-
-The project continuously monitors a folder using **Watchdog**.
-
-Whenever a new meeting recording is detected:
-
-1. Waits briefly for the file copy to finish.
-2. Starts the Meeting Agent.
-3. Generates:
-   - Transcript
-   - Summary
-   - Action Items
-4. Saves the generated files.
-5. Sends a Windows desktop notification.
-
----
-
-# Generated Files
-
-For every meeting recording the following files are generated:
-
-- `transcript.txt`
-- `summary.txt`
-- `action_items.txt`
-
----
-
-# Error Handling
-
-The project includes:
-
-- Automatic retry for temporary Gemini API (503) errors.
-- Parallel chunk processing.
-- Transcript merging after all workers complete.
-- Video duration validation using FFprobe.
-- Separate execution paths for short and long videos.
-
----
-
-# Prerequisites
-
-Before running the project, ensure the following software is installed.
-
-## 1. Install Python
-
-Download Python 3.11 or later from:
-
-https://www.python.org/downloads/
-
-Verify the installation:
-
-```bash
-python --version
-```
-
----
-
-## 2. Install FFmpeg
-
-Download FFmpeg from:
-
-https://www.gyan.dev/ffmpeg/builds/
-
-Download the **Essentials Build** ZIP file.
-
-Extract it to a location such as:
+# Project Structure
 
 ```
-C:\ffmpeg
-```
-
-The folder structure should look like:
-
-```
-C:\ffmpeg
+AI-Meeting-Assistant/
 │
-└── bin
-     │
-     ├── ffmpeg.exe
-     ├── ffprobe.exe
-     └── ffplay.exe
+├── settings_gui.py
+├── watcher.py
+├── Metting_agent.py
+├── video_tanscript_generate.py
+├── utils.py
+├── config.json
+├── requirements.txt
+├── README.md
+└── .gitignore
 ```
 
 ---
 
-### Add FFmpeg to Windows PATH
+# Technologies Used
 
-1. Press **Windows Key**
-2. Search for **Environment Variables**
-3. Open **Edit the system environment variables**
-4. Click **Environment Variables**
-5. Under **System Variables**, select **Path**
-6. Click **Edit**
-7. Click **New**
-8. Add:
-
-```
-C:\ffmpeg\bin
-```
-
-9. Click **OK** on all windows.
-
-Restart your terminal.
-
-Verify the installation:
-
-```bash
-ffmpeg -version
-```
-
-and
-
-```bash
-ffprobe -version
-```
-
-Both commands should print the installed version.
+- Python
+- LangGraph
+- LangChain
+- Google Gemini 2.5 Flash
+- Google GenAI SDK
+- CustomTkinter
+- Watchdog
+- FFmpeg
+- FFprobe
+- Win11Toast
+- Threading
+- JSON Configuration
 
 ---
 
-## 3. Create a Google Gemini API Key
+# Installation
 
-Create a free API key from:
-
-https://aistudio.google.com/app/apikey
-
----
-
-## 4. Clone the Repository
+## 1. Clone the Repository
 
 ```bash
 git clone https://github.com/yourusername/AI-Meeting-Assistant.git
@@ -335,7 +180,7 @@ cd AI-Meeting-Assistant
 
 ---
 
-## 5. Create a Virtual Environment
+## 2. Create a Virtual Environment
 
 Windows
 
@@ -343,7 +188,7 @@ Windows
 python -m venv venv
 ```
 
-Activate it:
+Activate it
 
 ```bash
 venv\Scripts\activate
@@ -351,7 +196,7 @@ venv\Scripts\activate
 
 ---
 
-## 6. Install Dependencies
+## 3. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -359,77 +204,250 @@ pip install -r requirements.txt
 
 ---
 
-## 7. Configure Environment Variables
+# Install FFmpeg
 
-Create a file named:
+Download FFmpeg from
 
-```
-.env
-```
+https://www.gyan.dev/ffmpeg/builds/
 
-Add your Gemini API key:
+Download the **Essentials Build**.
 
-```env
-GOOGLE_API_KEY=YOUR_API_KEY
-```
-
----
-
-## 8. Configure the Watch Folder
-
-Open:
+Extract it, for example:
 
 ```
-watcher.py
+C:\ffmpeg
 ```
 
-Modify:
+Your directory should look like
 
-```python
-WATCH_FOLDER = r"YOUR_MEETING_FOLDER"
 ```
-
-Example:
-
-```python
-WATCH_FOLDER = r"C:\Meetings"
+C:\ffmpeg
+│
+└── bin
+    ├── ffmpeg.exe
+    ├── ffprobe.exe
+    └── ffplay.exe
 ```
 
 ---
 
-# Run the Project
+## Add FFmpeg to PATH
 
-Start the watcher:
+Add
+
+```
+C:\ffmpeg\bin
+```
+
+to your Windows PATH.
+
+Verify the installation.
 
 ```bash
-python watcher.py
+ffmpeg -version
 ```
 
-Now copy or move a meeting recording into the configured watch folder.
+```bash
+ffprobe -version
+```
 
-The Meeting Assistant will automatically:
+Both commands should display version information.
 
-- Detect the new recording
-- Generate a transcript
-- Generate a summary
-- Extract action items
-- Save the generated files
-- Display a Windows notification
+---
+
+# Create a Gemini API Key
+
+Create a free API key from
+
+https://aistudio.google.com/app/apikey
+
+---
+
+# Running the Application
+
+Launch the GUI.
+
+```bash
+python settings_gui.py
+```
+
+---
+
+# GUI
+
+The application provides a simple desktop interface.
+
+Fill in:
+
+- Google Gemini API Key
+- Meeting Folder
+- Output Folder
+
+Click
+
+```
+Save Settings
+```
+
+The application stores these values inside
+
+```
+config.json
+```
+
+so they are automatically loaded the next time the application starts.
+
+---
+
+After saving the settings, click
+
+```
+Start Monitoring
+```
+
+The application will continuously monitor the selected meeting folder.
+
+Whenever a new meeting recording is added, processing begins automatically.
+
+---
+
+To stop monitoring, click
+
+```
+Stop Monitoring
+```
+
+---
+
+# Supported File Formats
+
+- MP4
+- MOV
+- MKV
+- MP3
+- WAV
+
+---
+
+# Processing Pipeline
+
+Whenever a new recording is detected:
+
+1. Watchdog detects the file.
+2. Waits briefly until copying is complete.
+3. LangGraph workflow starts.
+4. Meeting duration is checked.
+5. Short meetings are uploaded directly.
+6. Long meetings are split into chunks.
+7. Gemini generates a verbatim transcript.
+8. LangChain generates:
+   - Meeting Summary
+   - Action Items
+9. Files are saved.
+10. Windows notification is displayed.
+
+---
+
+# Output Structure
+
+The selected output folder will contain one folder for every meeting.
+
+```
+Output Folder
+│
+├── Sprint Planning/
+│   ├── transcript.txt
+│   ├── summary.txt
+│   ├── action_items.txt
+│
+├── Client Meeting/
+│   ├── transcript.txt
+│   ├── summary.txt
+│   ├── action_items.txt
+│
+└── Quarterly Review/
+    ├── transcript.txt
+    ├── summary.txt
+    ├── action_items.txt
+    └── chunks/
+        ├── chunk_000.mp4
+        ├── chunk_001.mp4
+        └── chunk_002.mp4
+```
+
+The `chunks` directory is created only for long meetings.
+
+---
+
+# Configuration
+
+All application settings are stored in
+
+```
+config.json
+```
+
+Example
+
+```json
+{
+    "api_key": "YOUR_GEMINI_API_KEY",
+    "meeting_folder": "C:/Meetings",
+    "output_folder": "C:/Meeting_Output"
+}
+```
+
+The application automatically reads this configuration every time it starts.
+
+---
+
+# Error Handling
+
+The application includes several reliability features.
+
+- Automatic retry for temporary Gemini API failures.
+- Validation of meeting duration.
+- Parallel chunk processing.
+- Ordered transcript merging.
+- Meeting-specific output folders.
+- File monitoring with Watchdog.
+- Windows notification after successful completion.
 
 ---
 
 # Future Improvements
 
 - Speaker diarization
-- Meeting minutes generation
-- PDF report generation
+- Timestamped transcripts
+- PDF meeting reports
 - Email delivery
+- Microsoft Teams integration
+- Google Meet integration
 - Calendar integration
-- Cloud storage support
-- Vector database for meeting search
-- RAG over previous meetings
-- Multi-language transcript export
-- Streamlit web dashboard
+- Search previous meetings
+- Vector Database
+- RAG over meeting history
+- Meeting analytics dashboard
+- Docker support
+- Cloud storage integration
+
+---
+
+# Learning Highlights
+
+This project demonstrates practical experience with
+
+- LangGraph StateGraph
+- Subgraphs
+- Fan-Out / Fan-In architecture
+- Parallel AI workflows
+- LangChain Prompt Templates
+- Google Gemini API
+- Desktop GUI development
+- Folder monitoring automation
+- File processing
+- Configuration management
+- AI-powered workflow automation
 
 ---
 
@@ -437,4 +455,4 @@ The Meeting Assistant will automatically:
 
 **Shivam Kharade**
 
-Built using **LangGraph**, **Google Gemini**, **LangChain**, and **Python**.
+Built with ❤️ using Python, LangGraph, LangChain, Google Gemini, and CustomTkinter.
