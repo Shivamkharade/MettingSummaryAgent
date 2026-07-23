@@ -3,9 +3,12 @@ from typing import Any
 from google import genai
 from langchain_google_genai import ChatGoogleGenerativeAI
 import json
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
 
 
 CONFIG_FILE = Path("config.json")
+Global_model = 'gemini-3.6-flash'
 
 def get_output_directory(video_path: str) -> Path:
 
@@ -58,37 +61,37 @@ def extract_text(response):
 
     return str(content)
 
-def save_text_file(video_path: str, filename: str, content: Any) -> Path:
-    """
-    Saves text content into the meeting's output folder.
-    """
+# def save_text_file(video_path: str, filename: str, content: Any) -> Path:
+#     """
+#     Saves text content into the meeting's output folder.
+#     """
 
-    output_folder = get_output_directory(video_path)
-    file_path = output_folder / filename
+#     output_folder = get_output_directory(video_path)
+#     file_path = output_folder / filename
 
-    if isinstance(content, str):
-        text = content
+#     if isinstance(content, str):
+#         text = content
 
-    elif isinstance(content, dict):
-        text = content.get("text", str(content))
+#     elif isinstance(content, dict):
+#         text = content.get("text", str(content))
 
-    elif isinstance(content, list):
-        parts = []
-        for item in content:
-            if isinstance(item, dict):
-                parts.append(item.get("text", ""))
-            elif hasattr(item, "text"):
-                parts.append(item.text)
-            else:
-                parts.append(str(item))
-        text = "\n".join(parts)
+#     elif isinstance(content, list):
+#         parts = []
+#         for item in content:
+#             if isinstance(item, dict):
+#                 parts.append(item.get("text", ""))
+#             elif hasattr(item, "text"):
+#                 parts.append(item.text)
+#             else:
+#                 parts.append(str(item))
+#         text = "\n".join(parts)
 
-    else:
-        text = str(content)
+#     else:
+#         text = str(content)
 
-    file_path.write_text(text, encoding="utf-8")
+#     file_path.write_text(text, encoding="utf-8")
 
-    return file_path
+#     return file_path
 
 def load_config():
 
@@ -121,6 +124,62 @@ def get_gemini_client():
 
 def get_llm():
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model=Global_model,
         google_api_key=get_api_key()
     )
+
+def save_text_file(video_path: str, filename: str, content: Any) -> Path:
+    """
+    Saves content into a PDF file inside the meeting's output folder.
+
+    Example:
+        save_pdf_file(video_path, "summary.pdf", summary)
+    """
+
+    output_folder = get_output_directory(video_path)
+
+    # Ensure the filename ends with .pdf
+    if not filename.lower().endswith(".pdf"):
+        filename += ".pdf"
+
+    file_path = output_folder / filename
+
+    # Convert different content types to text
+    if isinstance(content, str):
+        text = content
+
+    elif isinstance(content, dict):
+        text = content.get("text", str(content))
+
+    elif isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                parts.append(item.get("text", ""))
+            elif hasattr(item, "text"):
+                parts.append(item.text)
+            else:
+                parts.append(str(item))
+        text = "\n".join(parts)
+
+    else:
+        text = str(content)
+
+    # Create PDF
+    doc = SimpleDocTemplate(str(file_path))
+    styles = getSampleStyleSheet()
+    style = styles["BodyText"]
+
+    story = []
+
+    # Preserve line breaks
+    for line in text.splitlines():
+        line = line.strip()
+        if line:
+            story.append(Paragraph(line.replace("\n", "<br/>"), style))
+        else:
+            story.append(Paragraph("&nbsp;", style))
+
+    doc.build(story)
+
+    return file_path

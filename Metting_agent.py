@@ -80,7 +80,7 @@ def summary_node(state: MeetingState):
     
     save_text_file(
     state["video_path"],
-    "summary.txt",
+    "summary",
     summary
     )
     
@@ -148,7 +148,7 @@ def action_items(state:MeetingState):
     # Replace this later with the helper function
     save_text_file(
     state["video_path"],
-    "action_items.txt",
+    "action_items",
     action_items_text
     )
     

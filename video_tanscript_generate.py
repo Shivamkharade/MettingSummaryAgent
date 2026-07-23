@@ -6,6 +6,7 @@ from utils import (
     save_text_file,
     get_output_directory,
     get_gemini_client,
+    Global_model
 )
 import time
 import operator
@@ -86,17 +87,18 @@ def route_video(state: TranscriptState) -> str:
 #------------------main nodes------------------#
 
 def transcript_node(state: TranscriptState):
-    print("enterd transcript node")
-    
+    print("Entered transcript node")
+
     client = get_gemini_client()
     video_path = state["video_path"]
 
-    # Upload video
+    print("Uploading video...")
+
+    # Upload only once
     video = client.files.upload(file=video_path)
-    
-    print("video is uploaded")
-    
-    # Wait until Google finishes processing
+
+    print("Video uploaded. Waiting for processing...")
+
     while True:
         video = client.files.get(name=video.name)
 
@@ -106,39 +108,74 @@ def transcript_node(state: TranscriptState):
         if str(video.state).endswith("FAILED"):
             raise RuntimeError("Video processing failed.")
 
+        print("Video is processing...")
         time.sleep(5)
-    
-    print("generating transcript started")
-    # Generate transcript
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[
-            video,
-            """
-            Generate a complete verbatim transcript of this meeting.
 
-            Requirements:
-            - Do not summarize.
-            - Preserve punctuation.
-            - Ignore background music.
-            - Include all spoken dialogue.
-            """
-        ]
-    )
+    print("Video is ACTIVE.")
 
-    transcript = response.text
-    
-    print("transcripted generated and saved exited transcript node")
-    # Save transcript
-    save_text_file(
-    state["video_path"],
-    "transcript.txt",
-    transcript
-    )
-    
-    return {
-        "transcript": transcript
-    }
+    MAX_RETRIES = 8
+    wait_time = 5
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            print(f"Generating transcript (Attempt {attempt + 1}/{MAX_RETRIES})...")
+
+            response = client.models.generate_content(
+                model=Global_model,
+                contents=[
+                    video,
+                    """
+                    Generate a complete verbatim transcript of this meeting.
+
+                    Requirements:
+                    - Do not summarize.
+                    - Preserve punctuation.
+                    - Ignore background music.
+                    - Include all spoken dialogue.
+                    """
+                ],
+            )
+
+            transcript = response.text
+
+            save_text_file(
+                state["video_path"],
+                "transcript",
+                transcript,
+            )
+
+            print("Transcript generated successfully.")
+
+            return {
+                "transcript": transcript
+            }
+
+        except ServerError as e:
+            if attempt == MAX_RETRIES - 1:
+                print("Maximum retries reached.")
+                raise
+
+            print(
+                f"Server busy (503). Waiting {wait_time} seconds before retry..."
+            )
+
+            time.sleep(wait_time)
+
+            # Exponential backoff
+            wait_time *= 2
+        except ServerError as e:
+            if attempt == MAX_RETRIES - 1:
+                print("Maximum retries reached.")
+                raise
+
+            wait_time = 10 * (attempt + 1)
+
+            print(
+                f"Gemini server is busy (503). "
+                f"Retrying in {wait_time} seconds..."
+            )
+
+            time.sleep(wait_time)
 
 def split_video_node(state: TranscriptState):
 
@@ -262,7 +299,7 @@ def transcribe_chunk_node(state: ChunkWorkerState):
     for attempt in range(MAX_RETRIES):
         try:
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=Global_model,
                 contents=[
                     video_file,
                     """
@@ -318,7 +355,7 @@ def merge_transcripts_node(state: TranscriptState):
     
     save_text_file(
         state['video_path'],
-        "transcript.txt",
+        "transcript",
         transcript
     )
     
