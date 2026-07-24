@@ -1,7 +1,7 @@
 import customtkinter as ctk
 from tkinter import filedialog
 from watcher import start_watchdog, stop_watchdog
-from utils import load_config,save_config
+from utils1 import load_config,save_config
 import threading
 
 
