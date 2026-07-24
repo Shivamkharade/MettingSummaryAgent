@@ -6,7 +6,7 @@ import json
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 
-
+PROCESSED_MEETINGS_FILE = Path("processed_meetings.json")
 CONFIG_FILE = Path("config.json")
 Global_model = 'gemini-3.6-flash'
 
@@ -31,7 +31,6 @@ def get_output_directory(video_path: str) -> Path:
     )
 
     return meeting_folder
-
 
 def extract_text(response):
 
@@ -61,38 +60,6 @@ def extract_text(response):
 
     return str(content)
 
-# def save_text_file(video_path: str, filename: str, content: Any) -> Path:
-#     """
-#     Saves text content into the meeting's output folder.
-#     """
-
-#     output_folder = get_output_directory(video_path)
-#     file_path = output_folder / filename
-
-#     if isinstance(content, str):
-#         text = content
-
-#     elif isinstance(content, dict):
-#         text = content.get("text", str(content))
-
-#     elif isinstance(content, list):
-#         parts = []
-#         for item in content:
-#             if isinstance(item, dict):
-#                 parts.append(item.get("text", ""))
-#             elif hasattr(item, "text"):
-#                 parts.append(item.text)
-#             else:
-#                 parts.append(str(item))
-#         text = "\n".join(parts)
-
-#     else:
-#         text = str(content)
-
-#     file_path.write_text(text, encoding="utf-8")
-
-#     return file_path
-
 def load_config():
 
     if not CONFIG_FILE.exists():
@@ -104,7 +71,6 @@ def load_config():
 
     with open(CONFIG_FILE, "r") as file:
         return json.load(file)
-
 
 def save_config(settings):
 
@@ -183,3 +149,32 @@ def save_text_file(video_path: str, filename: str, content: Any) -> Path:
     doc.build(story)
 
     return file_path
+
+def load_processed_meetings() -> dict:
+    """
+    Load the processed meetings JSON.
+
+    Returns:
+        {
+            "meetings": []
+        }
+        if the file doesn't exist.
+    """
+
+    if not PROCESSED_MEETINGS_FILE.exists():
+        return {
+            "meetings": []
+        }
+
+    with open(PROCESSED_MEETINGS_FILE, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+def save_processed_meetings(data: dict) -> None:
+    """
+    Save the processed meetings JSON.
+    """
+
+    with open(PROCESSED_MEETINGS_FILE, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=4)
+
+
