@@ -2,13 +2,15 @@ from pathlib import Path
 from typing import Any
 from google import genai
 from langchain_google_genai import ChatGoogleGenerativeAI
-import json
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
+import json
+import threading
 
 PROCESSED_MEETINGS_FILE = Path("processed_meetings.json")
 CONFIG_FILE = Path("config.json")
 Global_model = 'gemini-3.6-flash'
+meeting_registry_lock = threading.Lock()
 
 def get_output_directory(video_path: str) -> Path:
 

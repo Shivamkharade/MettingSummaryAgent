@@ -49,3 +49,4 @@ MeetingAgent.spec
 image.png
 what_needs_to_be_done.txt
 test.ipynb
+processed_meetings.json

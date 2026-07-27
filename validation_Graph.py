@@ -3,7 +3,8 @@ from langgraph.graph import StateGraph,START,END
 from utils1 import (
     load_processed_meetings,
     save_processed_meetings,
-    get_output_directory
+    get_output_directory,
+    meeting_registry_lock
 )
 from win11toast import toast
 import hashlib
@@ -38,41 +39,47 @@ def generate_hash_node(state: ValidationState):
     }
 
 def check_processed_node(state: ValidationState):
-    meetings = load_processed_meetings()
 
-    matching_meeting = next(
-        (
-            meeting
-            for meeting in meetings["meetings"]
-            if meeting["hash"] == state["meeting_hash"]
-        ),
-        None
-    )
+    with meeting_registry_lock:
+
+        meetings = load_processed_meetings()
+
+        matching_meeting = next(
+            (
+                meeting
+                for meeting in meetings["meetings"]
+                if meeting["hash"] == state["meeting_hash"]
+            ),
+            None
+        )
 
     if matching_meeting:
         return {
             "already_processed": True,
-            "video_path": matching_meeting["file_path"]
+            "video_path": matching_meeting["file_path"],
         }
 
     return {
         "already_processed": False,
-        "video_path": state["video_path"]
+        "video_path": state["video_path"],
     }
     
 def save_new_meeting_node(state: ValidationState):
-    meetings = load_processed_meetings()
 
-    meetings["meetings"].append({
-        "name": Path(state["video_path"]).name,
-        "file_path": state["video_path"],
-        "hash": state["meeting_hash"],
-    })
+    with meeting_registry_lock:
 
-    save_processed_meetings(meetings)
+        meetings = load_processed_meetings()
+
+        meetings["meetings"].append({
+            "name": Path(state["video_path"]).name,
+            "file_path": state["video_path"],
+            "hash": state["meeting_hash"],
+        })
+
+        save_processed_meetings(meetings)
 
     return {
-        'continue_processing' : True
+        "continue_processing": True
     }
     
 def already_processed_notification_node(state: ValidationState):

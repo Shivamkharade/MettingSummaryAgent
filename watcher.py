@@ -2,6 +2,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from pathlib import Path
 import time
+import threading
 
 # Import your compiled LangGraph
 from Metting_agent import graph
@@ -34,25 +35,35 @@ class MyHandler(FileSystemEventHandler):
         print(file_path)
         print("=" * 60)
         
-        print("Waiting 10 seconds for the file to finish copying...")
-        time.sleep(10)
+        thread = threading.Thread(
+            target=process_file,
+            args=(str(file_path),),
+            daemon=True
+        )
 
-        process_file(str(file_path))
+        thread.start()
 
 
 def process_file(path: str):
+
+    print("=" * 60)
+    print(f"Worker Thread Started:\n{path}")
+    print("=" * 60)
+
+    print("Waiting 10 seconds for the file to finish copying...")
+    time.sleep(10)
 
     print(f"Running Meeting Agent for:\n{path}")
 
     try:
 
-        result = graph.invoke(
+        graph.invoke(
             {
                 "video_path": path
             }
         )
 
-        print("\nMeeting processing completed successfully.")
+        print(f"\nMeeting completed:\n{path}")
 
     except Exception as e:
         print(f"\nError while processing meeting:\n{e}")

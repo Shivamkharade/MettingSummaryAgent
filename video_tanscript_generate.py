@@ -313,30 +313,41 @@ def transcribe_chunk_node(state: ChunkWorkerState):
                     """
                 ],
             )
-
+            
+            text = response.text
+            
+            if not text:
+                raise RuntimeError(
+                    f"Chunk {chunk_number} : Gemini returned and empty transcript"
+                )
+            
+            response_text = text
             # Success
             break
 
-        except ServerError as e:
+        except (ServerError,RuntimeError) as e:
             if attempt == MAX_RETRIES - 1:
                 raise
 
             wait_time = 10 * (attempt + 1)
 
             print(
-                f"Chunk {chunk_number}: Gemini is busy (503). "
+                f"Chunk {chunk_number} failed: {e}\n"
                 f"Retrying in {wait_time} seconds..."
             )
 
             time.sleep(wait_time)
 
-    print(f"Finished Chunk {chunk_number}")
+    print(
+        f"Finished Chunk {chunk_number} "
+        f"({len(response_text)} characters)"
+    )
 
     return {
         "transcripts": [
             {
                 "chunk_number": chunk_number,
-                "transcript": response.text,
+                "transcript": response_text,
             }
         ]
     }   
@@ -347,6 +358,17 @@ def merge_transcripts_node(state: TranscriptState):
         state["transcripts"],
         key=lambda item: item["chunk_number"]
     )
+
+    missing = [
+        item["chunk_number"]
+        for item in ordered
+        if not item["transcript"]
+    ]
+
+    if missing:
+        raise RuntimeError(
+            f"Missing transcript(s) for chunk(s): {missing}"
+        )
 
     transcript = "\n\n".join(
         item["transcript"]
