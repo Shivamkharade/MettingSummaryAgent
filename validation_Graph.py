@@ -12,40 +12,67 @@ from pathlib import Path
 
 class ValidationState(TypedDict):
     video_path: str
-    
     meeting_hash: Optional[str]
     already_processed: Optional[bool]
+    continue_processing: Optional[bool]
 
 def route_meeting(state):
     if state["already_processed"]:
-        return "skip"
+        return "already_processed"
 
-    return "process"
+    return "new_meeting"
 
-def generate_hash_node(file_path: str, chunk_size: int = 1024 * 1024) -> str:
-
+def generate_hash_node(state: ValidationState):
     sha256 = hashlib.sha256()
 
-    with open(file_path, "rb") as file:
-        while chunk := file.read(chunk_size):
+    with open(state["video_path"], "rb") as file:
+        while chunk := file.read(1024 * 1024):
             sha256.update(chunk)
     
-    hash = sha256.hexdigest()
+    meetings = load_processed_meetings()
     
+    save_processed_meetings(meetings)
+
     return {
-        'meeting_hash' : hash
+        "meeting_hash": sha256.hexdigest()
     }
 
 def check_processed_node(state: ValidationState):
     meetings = load_processed_meetings()
 
-    already_processed = any(
-        meeting["hash"] == state["meeting_hash"]
-        for meeting in meetings["meetings"]
+    matching_meeting = next(
+        (
+            meeting
+            for meeting in meetings["meetings"]
+            if meeting["hash"] == state["meeting_hash"]
+        ),
+        None
     )
 
+    if matching_meeting:
+        return {
+            "already_processed": True,
+            "video_path": matching_meeting["file_path"]
+        }
+
     return {
-        "already_processed": already_processed
+        "already_processed": False,
+        "video_path": state["video_path"]
+    }
+    
+def save_new_meeting_node(state: ValidationState):
+    meetings = load_processed_meetings()
+
+    meetings["meetings"].append({
+        "name": Path(state["video_path"]).name,
+        "file_path": state["video_path"],
+        "hash": state["meeting_hash"],
+    })
+
+    save_processed_meetings(meetings)
+
+    return {
+        'continue_processing' : True
     }
     
 def already_processed_notification_node(state: ValidationState):
@@ -70,19 +97,16 @@ def already_processed_notification_node(state: ValidationState):
         ]
     )
 
-    return {}
-    
-def route_meeting(state):
-    if state["already_processed"]:
-        return "already_processed"
-
-    return "new_meeting"
+    return {
+        'continue_processing' : False
+    }
 
 builder = StateGraph(ValidationState)
 
 builder.add_node("generate_hash", generate_hash_node)
 builder.add_node("check_processed", check_processed_node)
 builder.add_node("already_processed_notification", already_processed_notification_node)
+builder.add_node('save_new_meeting',save_new_meeting_node)
 
 builder.add_edge(START, "generate_hash")
 
@@ -96,8 +120,13 @@ builder.add_conditional_edges(
     route_meeting,
     {
         "already_processed": "already_processed_notification",
-        "new_meeting": END,
+        "new_meeting": 'save_new_meeting',
     }
+)
+
+builder.add_edge(
+    'save_new_meeting',
+    END
 )
 
 builder.add_edge(

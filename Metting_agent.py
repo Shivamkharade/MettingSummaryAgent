@@ -7,6 +7,7 @@ from utils1 import (
     extract_text,
     get_llm,
 )
+from validation_Graph import validation_graph
 from typing import TypedDict,Optional
 from pathlib import Path
 from win11toast import toast
@@ -16,11 +17,29 @@ from win11toast import toast
 class MeetingState(TypedDict):
     video_path: str
     output_dir: str
-
+    continue_processing: Optional[bool]
     transcript: Optional[str]
     summary: Optional[str]
     action_items: Optional[str]
+    
 
+def validation_node(state: MeetingState):
+    result = validation_graph.invoke(
+        {
+            "video_path": state["video_path"]
+        }
+    )
+
+    return {
+        "continue_processing": result["continue_processing"],
+        "video_path": result["video_path"]
+    }
+    
+def route_after_validation(state: MeetingState):
+    if state["continue_processing"]:
+        return "process"
+
+    return "stop"
 
 def transcript_node(state: MeetingState):
     result = transcript_graph.invoke(
@@ -187,13 +206,23 @@ def notification_node(state: MeetingState):
 builder = StateGraph(MeetingState)
 
 # adding nodes
+builder.add_node("validation", validation_node)
 builder.add_node('transcript',transcript_node)
 builder.add_node('summary',summary_node)
 builder.add_node('action_items',action_items)
 builder.add_node('notification',notification_node)
 
 # adding edges
-builder.add_edge(START, "transcript")
+builder.add_edge(START, "validation")
+
+builder.add_conditional_edges(
+    "validation",
+    route_after_validation,
+    {
+        "process": "transcript",
+        "stop": END,
+    }
+)
 
 builder.add_edge("transcript", "summary")
 builder.add_edge("transcript", "action_items")

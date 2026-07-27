@@ -1,149 +1,193 @@
 # 🎥 AI Meeting Assistant
 
-An AI-powered desktop application that automatically monitors a folder for new meeting recordings, generates a verbatim transcript using Google Gemini, summarizes the meeting, extracts action items, and organizes all outputs into meeting-specific folders.
+> **An AI-powered desktop automation application that continuously monitors a folder for new meeting recordings, intelligently processes them using Google Gemini, and automatically generates transcripts, summaries, action items, and organised meeting documentation.**
 
-The project is built using **Python**, **LangGraph**, **LangChain**, **Google Gemini**, and **CustomTkinter**, demonstrating graph-based AI workflows, parallel processing, desktop GUI development, and automation.
-
----
-
-# Features
-
-- 📁 Automatically monitors a folder for new meeting recordings.
-- 🎥 Supports multiple media formats:
-  - MP4
-  - MKV
-  - MOV
-  - MP3
-  - WAV
-- ✍️ Generates a complete verbatim transcript.
-- 📝 Produces a professional meeting summary.
-- ✅ Extracts action items with assignee and deadline (if mentioned).
-- 🔀 Automatically splits long meetings into smaller chunks.
-- ⚡ Parallel transcription using LangGraph Fan-Out / Fan-In.
-- 📂 Organizes outputs into meeting-specific folders.
-- 💾 Saves configuration using `config.json`.
-- 🖥️ Simple desktop GUI built with CustomTkinter.
-- 🔔 Windows desktop notification after processing.
-- 🔁 Automatic retry for temporary Gemini API failures.
+Built using **Python**, **LangGraph**, **LangChain**, **Google Gemini**, **CustomTkinter**, and **Watchdog**, this project demonstrates workflow orchestration, graph-based AI pipelines, desktop automation, parallel processing, and production-oriented application design.
 
 ---
 
-# Project Architecture
+# Table of Contents
 
-```
-                          CustomTkinter GUI
-                                  │
-                                  ▼
-                            config.json
-                                  │
-                                  ▼
-                             Watchdog
-                                  │
-                    Detect New Meeting Recording
-                                  │
-                                  ▼
-                        LangGraph Main Workflow
-                                  │
-        ┌─────────────────────────┼─────────────────────────┐
-        ▼                         ▼                         ▼
- Transcript Subgraph         Summary Node          Action Items Node
-        │                         │                         │
-        └───────────────┬─────────┴───────────────┬─────────┘
-                        ▼                         ▼
-                  Notification Node
-                        │
-                        ▼
-                       END
+- Overview
+- Problem Statement
+- Solution
+- Key Features
+- System Architecture
+- Workflow Overview
+- Validation Workflow
+- Transcript Workflow
+- Project Structure
+- Technology Stack
+- Engineering Decisions
+- Installation
+- Running the Application
+- Output Structure
+- Configuration
+- Error Handling & Reliability
+- Skills Demonstrated
+- Future Enhancements
+- Author
+
+---
+
+# Overview
+
+The AI Meeting Assistant is a desktop application that automatically watches a user-selected folder for new meeting recordings.
+
+Whenever a new recording appears, the application:
+
+- Detects the recording automatically
+- Verifies whether it has already been processed
+- Generates a complete verbatim transcript
+- Produces a professional meeting summary
+- Extracts action items
+- Organises all outputs into a dedicated meeting folder
+- Notifies the user when processing is complete
+
+The user simply drops a meeting recording into the monitored folder—the entire workflow is executed automatically.
+
+---
+
+# Problem Statement
+
+Modern teams record hundreds of online meetings every month.
+
+Finding information inside these recordings is difficult because users typically need to:
+
+- Watch the entire recording
+- Take manual notes
+- Identify action items
+- Organise documents manually
+
+This becomes increasingly time-consuming as the number of meetings grows.
+
+---
+
+# Solution
+
+This project automates the complete meeting documentation workflow using LangGraph-based AI pipelines.
+
+It continuously monitors a meeting folder and automatically performs duplicate validation, transcript generation, summarisation, action-item extraction, PDF generation, and desktop notification.
+
+---
+
+# Key Features
+
+- 📁 Automatic folder monitoring
+- 🎥 Supports MP4, MKV, MOV, MP3 and WAV
+- 🔐 SHA-256 duplicate meeting detection
+- ✍️ Verbatim transcript generation
+- 📝 AI meeting summaries
+- ✅ Action item extraction
+- ⚡ Automatic retry with exponential backoff
+- 🔀 Long-video chunking
+- 🚀 Parallel transcription using LangGraph Fan-Out / Fan-In
+- 📄 PDF generation
+- 📂 Meeting-specific output folders
+- 🔔 Windows desktop notifications
+- ⚙️ Persistent configuration
+
+---
+
+# System Architecture
+
+```text
+                    CustomTkinter GUI
+                           │
+                           ▼
+                    Configuration
+                           │
+                           ▼
+                 Watchdog Folder Monitor
+                           │
+                New Recording Detected
+                           │
+                           ▼
+                  LangGraph Main Graph
+                           │
+             ┌─────────────┴─────────────┐
+             ▼                           ▼
+     Validation Graph            Transcript Graph
+             │                           │
+     Duplicate?                  Short / Long
+             │                           │
+      ┌──────┴──────┐            ┌────────┴────────┐
+      ▼             ▼            ▼                 ▼
+     Stop      Continue      Direct AI      Chunk + Parallel
+                                              │
+                                              ▼
+                                      Merge Transcript
+                                              │
+                         ┌────────────────────┴────────────────────┐
+                         ▼                                         ▼
+                   Summary Node                           Action Items Node
+                         └────────────────────┬────────────────────┘
+                                              ▼
+                                      Notification Node
+                                              ▼
+                                             END
 ```
 
 ---
 
-# LangGraph Workflow
+# Workflow Overview
 
-## Main Graph
-
-```
+```text
 START
-   │
-   ▼
-Transcript Subgraph
-   │
-   ├────────► Summary
-   │
-   └────────► Action Items
-                    │
-                    ▼
-            Notification
-                    │
-                    ▼
-                   END
-```
-
----
-
-## Transcript Subgraph
-
-Before generating a transcript, the application checks the meeting duration.
-
-### Short Meeting
-
-```
-START
-   │
-Route Video
-   │
-   ▼
-Transcript Node
-   │
-   ▼
-END
-```
-
----
-
-### Long Meeting
-
-```
-START
-   │
-Route Video
-   │
-   ▼
-Split Video
-   │
-   ▼
-Fan-Out
-   │
-   ├────────────┐
-   ▼            ▼
-Chunk 1     Chunk 2     Chunk 3 ...
-   │            │
-   ▼            ▼
-Transcribe  Transcribe  Transcribe
-   │            │
-   └──────┬─────┘
+  │
+Validation
+  │
+  ├── Duplicate ─────────► END
+  │
+  ▼
+Transcript Graph
+  │
+  ├────────────┐
+  ▼            ▼
+Summary   Action Items
+  └───────┬────┘
           ▼
-     Merge Transcript
-          │
+   Notification
           ▼
          END
 ```
 
-Long meetings are automatically divided into **45-minute chunks**, processed in parallel, and merged back together in the correct order.
+---
+
+# Validation Workflow
+
+1. Compute SHA-256 hash
+2. Compare with processed meetings
+3. Skip duplicates
+4. Continue only for new meetings
+
+---
+
+# Transcript Workflow
+
+Short meetings are processed directly.
+
+Long meetings are:
+
+- Split into 45-minute chunks
+- Processed in parallel
+- Merged back into a single transcript
 
 ---
 
 # Project Structure
 
-```
+```text
 AI-Meeting-Assistant/
 │
 ├── settings_gui.py
 ├── watcher.py
-├── Metting_agent.py
-├── video_tanscript_generate.py
+├── Meeting_agent.py
+├── validation_graph.py
+├── video_transcript_generate.py
 ├── utils.py
 ├── config.json
+├── processed_meetings.json
 ├── requirements.txt
 ├── README.md
 └── .gitignore
@@ -151,113 +195,59 @@ AI-Meeting-Assistant/
 
 ---
 
-# Technologies Used
+# Technology Stack
 
-- Python
-- LangGraph
-- LangChain
-- Google Gemini 2.5 Flash
-- Google GenAI SDK
-- CustomTkinter
-- Watchdog
-- FFmpeg
-- FFprobe
-- Win11Toast
-- Threading
-- JSON Configuration
+| Category | Technology |
+|----------|------------|
+| Language | Python |
+| Workflow | LangGraph |
+| Prompting | LangChain |
+| AI Model | Google Gemini |
+| GUI | CustomTkinter |
+| Monitoring | Watchdog |
+| Video | FFmpeg / FFprobe |
+| PDF | ReportLab |
+| Notifications | Win11Toast |
+
+---
+
+# Engineering Decisions
+
+## Why LangGraph?
+
+The application is divided into independent graphs and nodes, making the workflow modular, maintainable and easy to extend.
+
+## Why SHA-256?
+
+Duplicate meetings are identified by content instead of filename, preventing unnecessary API usage.
+
+## Why Watchdog?
+
+The application behaves like a background desktop agent that automatically reacts to new recordings.
+
+## Why Parallel Processing?
+
+Long meetings are split into chunks and processed concurrently, reducing overall processing time.
 
 ---
 
 # Installation
 
-## 1. Clone the Repository
-
 ```bash
 git clone https://github.com/yourusername/AI-Meeting-Assistant.git
 
 cd AI-Meeting-Assistant
-```
 
----
-
-## 2. Create a Virtual Environment
-
-Windows
-
-```bash
 python -m venv venv
-```
 
-Activate it
-
-```bash
 venv\Scripts\activate
-```
 
----
-
-## 3. Install Dependencies
-
-```bash
 pip install -r requirements.txt
 ```
 
----
+Install FFmpeg and ensure both `ffmpeg` and `ffprobe` are available in your system PATH.
 
-# Install FFmpeg
-
-Download FFmpeg from
-
-https://www.gyan.dev/ffmpeg/builds/
-
-Download the **Essentials Build**.
-
-Extract it, for example:
-
-```
-C:\ffmpeg
-```
-
-Your directory should look like
-
-```
-C:\ffmpeg
-│
-└── bin
-    ├── ffmpeg.exe
-    ├── ffprobe.exe
-    └── ffplay.exe
-```
-
----
-
-## Add FFmpeg to PATH
-
-Add
-
-```
-C:\ffmpeg\bin
-```
-
-to your Windows PATH.
-
-Verify the installation.
-
-```bash
-ffmpeg -version
-```
-
-```bash
-ffprobe -version
-```
-
-Both commands should display version information.
-
----
-
-# Create a Gemini API Key
-
-Create a free API key from
+Create a Google Gemini API key from:
 
 https://aistudio.google.com/app/apikey
 
@@ -265,171 +255,75 @@ https://aistudio.google.com/app/apikey
 
 # Running the Application
 
-Launch the GUI.
-
 ```bash
 python settings_gui.py
 ```
 
----
+Configure:
 
-# GUI
-
-The application provides a simple desktop interface.
-
-Fill in:
-
-- Google Gemini API Key
+- Gemini API Key
 - Meeting Folder
 - Output Folder
 
-Click
-
-```
-Save Settings
-```
-
-The application stores these values inside
-
-```
-config.json
-```
-
-so they are automatically loaded the next time the application starts.
-
----
-
-After saving the settings, click
-
-```
-Start Monitoring
-```
-
-The application will continuously monitor the selected meeting folder.
-
-Whenever a new meeting recording is added, processing begins automatically.
-
----
-
-To stop monitoring, click
-
-```
-Stop Monitoring
-```
-
----
-
-# Supported File Formats
-
-- MP4
-- MOV
-- MKV
-- MP3
-- WAV
-
----
-
-# Processing Pipeline
-
-Whenever a new recording is detected:
-
-1. Watchdog detects the file.
-2. Waits briefly until copying is complete.
-3. LangGraph workflow starts.
-4. Meeting duration is checked.
-5. Short meetings are uploaded directly.
-6. Long meetings are split into chunks.
-7. Gemini generates a verbatim transcript.
-8. LangChain generates:
-   - Meeting Summary
-   - Action Items
-9. Files are saved.
-10. Windows notification is displayed.
+Click **Save Settings**, then **Start Monitoring**.
 
 ---
 
 # Output Structure
 
-The selected output folder will contain one folder for every meeting.
-
-```
-Output Folder
+```text
+Meeting_Output/
 │
 ├── Sprint Planning/
-│   ├── transcript.txt
-│   ├── summary.txt
-│   ├── action_items.txt
+│   ├── transcript.pdf
+│   ├── summary.pdf
+│   └── action_items.pdf
 │
-├── Client Meeting/
-│   ├── transcript.txt
-│   ├── summary.txt
-│   ├── action_items.txt
-│
-└── Quarterly Review/
-    ├── transcript.txt
-    ├── summary.txt
-    ├── action_items.txt
+└── Client Meeting/
+    ├── transcript.pdf
+    ├── summary.pdf
+    ├── action_items.pdf
     └── chunks/
-        ├── chunk_000.mp4
-        ├── chunk_001.mp4
-        └── chunk_002.mp4
 ```
-
-The `chunks` directory is created only for long meetings.
 
 ---
 
-# Configuration
+# Error Handling & Reliability
 
-All application settings are stored in
-
-```
-config.json
-```
-
-Example
-
-```json
-{
-    "api_key": "YOUR_GEMINI_API_KEY",
-    "meeting_folder": "C:/Meetings",
-    "output_folder": "C:/Meeting_Output"
-}
-```
-
-The application automatically reads this configuration every time it starts.
+- SHA-256 duplicate validation
+- Retry with exponential backoff
+- Parallel chunk processing
+- Ordered transcript merging
+- Desktop notifications
+- Automatic configuration loading
 
 ---
 
-# Error Handling
+# Skills Demonstrated
 
-The application includes several reliability features.
-
-- Automatic retry for temporary Gemini API failures.
-- Validation of meeting duration.
-- Parallel chunk processing.
-- Ordered transcript merging.
-- Meeting-specific output folders.
-- File monitoring with Watchdog.
-- Windows notification after successful completion.
+- Python
+- LangGraph
+- LangChain
+- Google Gemini
+- AI Workflow Design
+- Parallel Processing
+- Desktop Automation
+- Prompt Engineering
+- Desktop GUI Development
+- File System Monitoring
 
 ---
 
-# Learning Highlights
+# Future Enhancements
 
-This project demonstrates practical experience with
-
-- LangGraph StateGraph
-- Subgraphs
-- Fan-Out / Fan-In architecture
-- Parallel AI workflows
-- LangChain Prompt Templates
-- Google Gemini API
-- Desktop GUI development
-- Folder monitoring automation
-- File processing
-- Configuration management
-- AI-powered workflow automation
+- Speaker diarisation
+- Meeting sentiment analysis
+- Vector database search
+- RAG chatbot
+- Microsoft Teams integration
+- Zoom integration
+- Calendar integration
+- Docker deployment
 
 ---
 
@@ -437,4 +331,4 @@ This project demonstrates practical experience with
 
 **Shivam Kharade**
 
-Built with Python, LangGraph, LangChain, Google Gemini, and CustomTkinter.
+Built to demonstrate workflow orchestration, AI automation, desktop application development, and production-oriented software design.
