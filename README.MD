@@ -1,101 +1,38 @@
 # 🎥 AI Meeting Assistant
 
-> **An AI-powered desktop automation application that continuously monitors a folder for new meeting recordings, intelligently processes them using Google Gemini, and automatically generates transcripts, summaries, action items, and organised meeting documentation.**
+> **An AI-powered desktop application that automatically watches a folder for new meeting recordings, generates transcripts using Google Gemini, creates meeting summaries and action items, and organizes everything into structured meeting folders.**
 
-Built using **Python**, **LangGraph**, **LangChain**, **Google Gemini**, **CustomTkinter**, and **Watchdog**, this project demonstrates workflow orchestration, graph-based AI pipelines, desktop automation, parallel processing, and production-oriented application design.
-
----
-
-# Table of Contents
-
-- Overview
-- Problem Statement
-- Solution
-- Key Features
-- System Architecture
-- Workflow Overview
-- Validation Workflow
-- Transcript Workflow
-- Project Structure
-- Technology Stack
-- Engineering Decisions
-- Installation
-- Running the Application
-- Output Structure
-- Configuration
-- Error Handling & Reliability
-- Skills Demonstrated
-- Future Enhancements
-- Author
+Built using **Python**, **LangGraph**, **LangChain**, **Google Gemini**, **CustomTkinter**, **Watchdog**, and **FFmpeg**, this project demonstrates workflow orchestration, AI automation, desktop application development, parallel processing, and production-oriented software design.
 
 ---
 
-# Overview
+# 🚀 Features
 
-The AI Meeting Assistant is a desktop application that automatically watches a user-selected folder for new meeting recordings.
-
-Whenever a new recording appears, the application:
-
-- Detects the recording automatically
-- Verifies whether it has already been processed
-- Generates a complete verbatim transcript
-- Produces a professional meeting summary
-- Extracts action items
-- Organises all outputs into a dedicated meeting folder
-- Notifies the user when processing is complete
-
-The user simply drops a meeting recording into the monitored folder—the entire workflow is executed automatically.
-
----
-
-# Problem Statement
-
-Modern teams record hundreds of online meetings every month.
-
-Finding information inside these recordings is difficult because users typically need to:
-
-- Watch the entire recording
-- Take manual notes
-- Identify action items
-- Organise documents manually
-
-This becomes increasingly time-consuming as the number of meetings grows.
-
----
-
-# Solution
-
-This project automates the complete meeting documentation workflow using LangGraph-based AI pipelines.
-
-It continuously monitors a meeting folder and automatically performs duplicate validation, transcript generation, summarisation, action-item extraction, PDF generation, and desktop notification.
-
----
-
-# Key Features
-
-- 📁 Automatic folder monitoring
-- 🎥 Supports MP4, MKV, MOV, MP3 and WAV
+- 🎥 Automatic meeting recording detection
+- 📂 Folder monitoring using Watchdog
+- 🖥️ Desktop GUI using CustomTkinter
 - 🔐 SHA-256 duplicate meeting detection
-- ✍️ Verbatim transcript generation
-- 📝 AI meeting summaries
-- ✅ Action item extraction
-- ⚡ Automatic retry with exponential backoff
-- 🔀 Long-video chunking
-- 🚀 Parallel transcription using LangGraph Fan-Out / Fan-In
-- 📄 PDF generation
-- 📂 Meeting-specific output folders
+- 📄 Verbatim transcript generation
+- 📝 AI-generated meeting summaries
+- ✅ Automatic action item extraction
+- 📑 PDF generation for all outputs
+- 🚀 Parallel processing of long meetings
+- ⚡ Fan-Out / Fan-In workflow using LangGraph
+- 🔄 Meeting lifecycle tracking
 - 🔔 Windows desktop notifications
+- 📁 Automatic meeting-specific output folders
 - ⚙️ Persistent configuration
+- 🧵 Multi-threaded processing
 
 ---
 
-# System Architecture
+# 🏗️ System Architecture
 
 ```text
                     CustomTkinter GUI
                            │
                            ▼
-                    Configuration
+                 Save Configuration
                            │
                            ▼
                  Watchdog Folder Monitor
@@ -103,232 +40,403 @@ It continuously monitors a meeting folder and automatically performs duplicate v
                 New Recording Detected
                            │
                            ▼
-                  LangGraph Main Graph
+                 Generate SHA-256 Hash
                            │
-             ┌─────────────┴─────────────┐
-             ▼                           ▼
-     Validation Graph            Transcript Graph
-             │                           │
-     Duplicate?                  Short / Long
-             │                           │
-      ┌──────┴──────┐            ┌────────┴────────┐
-      ▼             ▼            ▼                 ▼
-     Stop      Continue      Direct AI      Chunk + Parallel
-                                              │
-                                              ▼
-                                      Merge Transcript
-                                              │
-                         ┌────────────────────┴────────────────────┐
-                         ▼                                         ▼
-                   Summary Node                           Action Items Node
-                         └────────────────────┬────────────────────┘
-                                              ▼
-                                      Notification Node
-                                              ▼
-                                             END
+                           ▼
+                 Main LangGraph Workflow
+                           │
+          ┌────────────────┴────────────────┐
+          ▼                                 ▼
+ Validation Graph                  Transcript Graph
+          │                                 │
+          ▼                                 ▼
+Duplicate Check                 Short / Long Meeting
+          │                                 │
+          ▼                                 ▼
+Already Processed?                 Split if Required
+          │                                 │
+          ▼                                 ▼
+     Stop Processing          Parallel Chunk Transcription
+                                            │
+                                            ▼
+                                   Merge Transcript
+                                            │
+                  ┌─────────────────────────┴────────────────────┐
+                  ▼                                              ▼
+          Summary Generator                           Action Item Generator
+                  └─────────────────────────┬────────────────────┘
+                                            ▼
+                                   Desktop Notification
+                                            ▼
+                                           END
 ```
 
 ---
 
-# Workflow Overview
+# 🔄 Workflow
 
 ```text
 START
-  │
+   │
 Validation
-  │
-  ├── Duplicate ─────────► END
-  │
-  ▼
-Transcript Graph
-  │
-  ├────────────┐
-  ▼            ▼
-Summary   Action Items
-  └───────┬────┘
-          ▼
-   Notification
+   │
+   ├──────── Already Processed ───────► END
+   │
+   ▼
+Transcript Generation
+   │
+   ├─────────────┐
+   ▼             ▼
+Summary     Action Items
+      \       /
+       \     /
+     Notification
+          │
           ▼
          END
 ```
 
 ---
 
-# Validation Workflow
+# ✅ Validation Workflow
 
-1. Compute SHA-256 hash
-2. Compare with processed meetings
-3. Skip duplicates
-4. Continue only for new meetings
+Every meeting is uniquely identified using a **SHA-256 hash**.
 
----
+The application maintains a persistent registry (`processed_meetings.json`) containing:
 
-# Transcript Workflow
+- Meeting Name
+- File Path
+- Meeting Hash
+- Processing Status
+- Last Completed Workflow Step
 
-Short meetings are processed directly.
-
-Long meetings are:
-
-- Split into 45-minute chunks
-- Processed in parallel
-- Merged back into a single transcript
-
----
-
-# Project Structure
+## Meeting Lifecycle
 
 ```text
-AI-Meeting-Assistant/
-│
-├── settings_gui.py
-├── watcher.py
-├── Meeting_agent.py
-├── validation_graph.py
-├── video_transcript_generate.py
-├── utils.py
-├── config.json
-├── processed_meetings.json
-├── requirements.txt
-├── README.md
-└── .gitignore
+new
+ │
+ ▼
+processing (validation)
+ │
+ ▼
+processing (transcript)
+ │
+ ▼
+processing (summary)
+ │
+ ▼
+processing (action_items)
+ │
+ ▼
+completed
 ```
+
+If the application crashes during processing:
+
+```text
+processing
+      │
+      ▼
+failed
+      │
+      ▼
+Automatic Retry
+```
+
+This ensures partially processed meetings are resumed instead of being treated as duplicates.
 
 ---
 
-# Technology Stack
+# 🎥 Transcript Workflow
+
+The application automatically determines whether a meeting is **short** or **long**.
+
+## Short Meetings
+
+```text
+Video
+   │
+   ▼
+Gemini
+   │
+   ▼
+Transcript
+```
+
+## Long Meetings
+
+```text
+Video
+   │
+   ▼
+Split into 45-minute chunks
+   │
+   ▼
+Fan-Out
+   │
+   ▼
+Parallel Gemini Transcription
+   │
+   ▼
+Merge
+   │
+   ▼
+Final Transcript
+```
+
+Long recordings are processed significantly faster by transcribing multiple chunks simultaneously.
+
+---
+
+# 🛠️ Technology Stack
 
 | Category | Technology |
 |----------|------------|
 | Language | Python |
 | Workflow | LangGraph |
-| Prompting | LangChain |
-| AI Model | Google Gemini |
+| AI Framework | LangChain |
+| LLM | Google Gemini |
 | GUI | CustomTkinter |
-| Monitoring | Watchdog |
-| Video | FFmpeg / FFprobe |
-| PDF | ReportLab |
+| File Monitoring | Watchdog |
+| Video Processing | FFmpeg / FFprobe |
+| PDF Generation | ReportLab |
 | Notifications | Win11Toast |
 
 ---
 
-# Engineering Decisions
+# 📂 Project Structure
 
-## Why LangGraph?
-
-The application is divided into independent graphs and nodes, making the workflow modular, maintainable and easy to extend.
-
-## Why SHA-256?
-
-Duplicate meetings are identified by content instead of filename, preventing unnecessary API usage.
-
-## Why Watchdog?
-
-The application behaves like a background desktop agent that automatically reacts to new recordings.
-
-## Why Parallel Processing?
-
-Long meetings are split into chunks and processed concurrently, reducing overall processing time.
+```text
+AI-Meeting-Assistant/
+│
+├── Meeting_agent.py
+├── validation_graph.py
+├── video_transcript_generate.py
+├── watcher.py
+├── settings_gui.py
+├── utils1.py
+│
+├── config.json
+├── processed_meetings.json
+├── requirements.txt
+├── README.md
+│
+├── output/
+│
+└── recordings/
+```
 
 ---
 
-# Installation
+# ⚙️ Installation
+
+## 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/AI-Meeting-Assistant.git
+git clone https://github.com/<your-github-username>/AI-Meeting-Assistant.git
 
 cd AI-Meeting-Assistant
+```
 
+---
+
+## 2. Create a Virtual Environment
+
+### Windows
+
+```bash
 python -m venv venv
 
 venv\Scripts\activate
+```
 
+### Linux / macOS
+
+```bash
+python3 -m venv venv
+
+source venv/bin/activate
+```
+
+---
+
+## 3. Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-Install FFmpeg and ensure both `ffmpeg` and `ffprobe` are available in your system PATH.
+---
 
-Create a Google Gemini API key from:
+# 🎬 Install FFmpeg
+
+The application requires **FFmpeg** and **FFprobe**.
+
+Download:
+
+https://ffmpeg.org/download.html
+
+After installation:
+
+- Add the **FFmpeg `bin`** folder to your system **PATH**.
+
+Verify the installation:
+
+```bash
+ffmpeg -version
+
+ffprobe -version
+```
+
+---
+
+# 🔑 Create a Google Gemini API Key
+
+Generate an API key from:
 
 https://aistudio.google.com/app/apikey
 
 ---
 
-# Running the Application
+# ▶️ How to Use
+
+## Step 1
+
+Run the application:
 
 ```bash
 python settings_gui.py
 ```
 
-Configure:
+---
 
-- Gemini API Key
+## Step 2
+
+Enter:
+
+- Google Gemini API Key
 - Meeting Folder
 - Output Folder
 
-Click **Save Settings**, then **Start Monitoring**.
-
 ---
 
-# Output Structure
+## Step 3
 
-```text
-Meeting_Output/
-│
-├── Sprint Planning/
-│   ├── transcript.pdf
-│   ├── summary.pdf
-│   └── action_items.pdf
-│
-└── Client Meeting/
-    ├── transcript.pdf
-    ├── summary.pdf
-    ├── action_items.pdf
-    └── chunks/
+Click:
+
+```
+Save Settings
 ```
 
 ---
 
-# Error Handling & Reliability
+## Step 4
 
-- SHA-256 duplicate validation
-- Retry with exponential backoff
-- Parallel chunk processing
-- Ordered transcript merging
-- Desktop notifications
-- Automatic configuration loading
+Click:
+
+```
+Start Monitoring
+```
+
+The application will now monitor the selected meeting folder continuously.
 
 ---
 
-# Skills Demonstrated
+## Step 5
+
+Copy or move a meeting recording into the monitored folder.
+
+Supported formats:
+
+- MP4
+- MOV
+- MKV
+- MP3
+- WAV
+
+---
+
+## Step 6
+
+The application automatically:
+
+- Detects the meeting recording
+- Computes the SHA-256 hash
+- Checks for duplicates
+- Generates a transcript
+- Creates a meeting summary
+- Extracts action items
+- Saves all outputs as PDF files
+- Displays a Windows notification when processing is complete
+
+No manual intervention is required.
+
+---
+
+# 📁 Output Structure
+
+```text
+Output/
+
+├── Sprint Planning/
+│   ├── transcript.pdf
+│   ├── summary.pdf
+│   ├── action_items.pdf
+│
+├── Client Meeting/
+│   ├── transcript.pdf
+│   ├── summary.pdf
+│   ├── action_items.pdf
+│   └── chunks/
+│
+└── Team Sync/
+    ├── transcript.pdf
+    ├── summary.pdf
+    └── action_items.pdf
+```
+
+---
+
+# 🛡️ Error Handling & Reliability
+
+The application includes:
+
+- SHA-256 duplicate detection
+- Meeting lifecycle tracking
+- Automatic retry of failed meetings
+- Thread-safe registry updates
+- Multi-threaded meeting processing
+- Automatic retry for temporary Gemini server errors
+- Exponential backoff
+- Parallel chunk transcription
+- Ordered transcript merging
+
+---
+
+# 💡 Skills Demonstrated
 
 - Python
 - LangGraph
 - LangChain
-- Google Gemini
-- AI Workflow Design
-- Parallel Processing
-- Desktop Automation
+- Google Gemini API
+- Workflow Orchestration
+- AI Automation
 - Prompt Engineering
-- Desktop GUI Development
+- Desktop Application Development
+- Parallel Processing
+- Multi-threading
 - File System Monitoring
+- PDF Generation
+- Software Architecture
+- Error Recovery
+- Production-Oriented Design
 
 ---
 
-# Future Enhancements
-
-- Speaker diarisation
-- Meeting sentiment analysis
-- Vector database search
-- RAG chatbot
-- Microsoft Teams integration
-- Zoom integration
-- Calendar integration
-- Docker deployment
-
----
-
-# Author
+# 👨‍💻 Author
 
 **Shivam Kharade**
 
-Built to demonstrate workflow orchestration, AI automation, desktop application development, and production-oriented software design.
+This project was built to demonstrate modern AI workflow orchestration, desktop automation, LangGraph-based pipeline design, and production-oriented software engineering.
+
+If you found this project interesting, feel free to ⭐ the repository.
