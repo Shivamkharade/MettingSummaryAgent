@@ -4,10 +4,8 @@ from watcher import start_watchdog, stop_watchdog
 from utils1 import load_config,save_config
 import threading
 
-
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
-
 
 def browse_meeting_folder():
 
@@ -18,8 +16,7 @@ def browse_meeting_folder():
         meeting_folder_entry.delete(0, "end")
 
         meeting_folder_entry.insert(0, folder)
-
-        
+      
 def browse_output_folder():
 
     folder = filedialog.askdirectory()
@@ -29,7 +26,6 @@ def browse_output_folder():
         output_folder_entry.delete(0, "end")
 
         output_folder_entry.insert(0, folder)
-
 
 def save_settings():
 
@@ -44,7 +40,6 @@ def save_settings():
     status_label.configure(
         text="Status : Settings Saved"
     )
-
 
 def load_settings():
 
@@ -64,7 +59,6 @@ def load_settings():
         0,
         settings.get("output_folder", "")
     )
-
 
 def start_monitoring():
 
@@ -140,7 +134,6 @@ title.pack(
     pady=15
 )
 
-
 # ------------------------------------
 # Settings Frame
 # ------------------------------------
@@ -157,7 +150,6 @@ settings_frame.grid_columnconfigure(
     1,
     weight=1
 )
-
 
 # ------------------------------------
 # API KEY
@@ -186,7 +178,6 @@ api_entry.grid(
     pady=20,
     sticky="ew"
 )
-
 
 # ------------------------------------
 # Meeting Folder
@@ -229,7 +220,6 @@ meeting_folder_button.grid(
     pady=20
 )
 
-
 # ------------------------------------
 # Output Folder
 # ------------------------------------
@@ -270,7 +260,6 @@ output_folder_button.grid(
     padx=(0, 20),
     pady=20
 )
-
 
 # ------------------------------------
 # Buttons

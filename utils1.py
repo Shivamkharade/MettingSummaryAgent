@@ -6,6 +6,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 import json
 import threading
+import hashlib
 
 PROCESSED_MEETINGS_FILE = Path("processed_meetings.json")
 CONFIG_FILE = Path("config.json")
@@ -219,3 +220,13 @@ def update_meeting_status(
         raise ValueError(
             f"Meeting with hash '{meeting_hash}' was not found."
         )
+
+def generate_meeting_hash(path: str) -> str:
+
+    sha256 = hashlib.sha256()
+
+    with open(path, "rb") as file:
+        while chunk := file.read(1024 * 1024):
+            sha256.update(chunk)
+
+    return sha256.hexdigest()

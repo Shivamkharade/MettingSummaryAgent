@@ -28,7 +28,8 @@ def validation_node(state: MeetingState):
 
     result = validation_graph.invoke(
         {
-            "video_path": state["video_path"]
+            "video_path": state["video_path"],
+            "meeting_hash": state["meeting_hash"],
         }
     )
 

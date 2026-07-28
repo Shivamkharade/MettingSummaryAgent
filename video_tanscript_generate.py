@@ -13,7 +13,6 @@ import operator
 import subprocess
 import json
 
-
 class ChunkTranscript(TypedDict):
     chunk_number: int
     transcript: str

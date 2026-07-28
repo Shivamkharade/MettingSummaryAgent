@@ -3,11 +3,9 @@ from watchdog.events import FileSystemEventHandler
 from pathlib import Path
 import time
 import threading
-
 # Import your compiled LangGraph
 from Metting_agent import graph
-from utils1 import update_meeting_status
-import hashlib
+from utils1 import update_meeting_status,generate_meeting_hash
 
 observer = None
 # WATCH_FOLDER = r"C:\Users\SKharade\Projects and Learning\C_TEST_RECORDING\New folder"
@@ -45,17 +43,6 @@ class MyHandler(FileSystemEventHandler):
 
         thread.start()
 
-
-def generate_meeting_hash(path: str) -> str:
-
-    sha256 = hashlib.sha256()
-
-    with open(path, "rb") as file:
-        while chunk := file.read(1024 * 1024):
-            sha256.update(chunk)
-
-    return sha256.hexdigest()
-
 def process_file(path: str):
 
     print("=" * 60)
@@ -73,7 +60,8 @@ def process_file(path: str):
 
         graph.invoke(
             {
-                "video_path": path
+                "video_path": path,
+                "meeting_hash":meeting_hash
             }
         )
 
@@ -89,7 +77,6 @@ def process_file(path: str):
             pass
 
         print(f"\nError while processing meeting:\n{e}")
-
 
 def start_watchdog(folder_path):
 

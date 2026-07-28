@@ -8,7 +8,6 @@ from utils1 import (
     update_meeting_status
 )
 from win11toast import toast
-import hashlib
 from pathlib import Path
 
 class ValidationState(TypedDict):
@@ -32,17 +31,6 @@ def route_meeting(state: ValidationState):
         case "processing":
             return "retry_meeting"
 
-def generate_hash_node(state: ValidationState):
-    sha256 = hashlib.sha256()
-
-    with open(state["video_path"], "rb") as file:
-        while chunk := file.read(1024 * 1024):
-            sha256.update(chunk)
-    
-    return {
-        "meeting_hash": sha256.hexdigest()
-    }
-
 def check_processed_node(state: ValidationState):
 
     with meeting_registry_lock:
@@ -63,12 +51,14 @@ def check_processed_node(state: ValidationState):
         return {
             "status": "new",
             "video_path": state["video_path"],
+            "meeting_hash": state["meeting_hash"],
         }
 
     # Meeting already exists
     return {
         "status": matching_meeting["status"],
         "video_path": matching_meeting["file_path"],
+        "meeting_hash": state["meeting_hash"],
     }
     
 def save_new_meeting_node(state: ValidationState):
@@ -137,18 +127,12 @@ def already_processed_notification_node(state: ValidationState):
 
 builder = StateGraph(ValidationState)
 
-builder.add_node("generate_hash", generate_hash_node)
 builder.add_node("check_processed", check_processed_node)
 builder.add_node("already_processed_notification", already_processed_notification_node)
 builder.add_node('save_new_meeting',save_new_meeting_node)
 builder.add_node("retry_meeting", retry_meeting_node)
 
-builder.add_edge(START, "generate_hash")
-
-builder.add_edge(
-    "generate_hash",
-    "check_processed"
-)
+builder.add_edge(START, "check_processed")
 
 builder.add_conditional_edges(
     "check_processed",
