@@ -1,27 +1,36 @@
-from typing import TypedDict,Optional
+from typing import TypedDict,Optional,Literal
 from langgraph.graph import StateGraph,START,END
 from utils1 import (
     load_processed_meetings,
     save_processed_meetings,
     get_output_directory,
-    meeting_registry_lock
+    meeting_registry_lock,
+    update_meeting_status
 )
 from win11toast import toast
 import hashlib
 from pathlib import Path
 
-
 class ValidationState(TypedDict):
     video_path: str
     meeting_hash: Optional[str]
-    already_processed: Optional[bool]
-    continue_processing: Optional[bool]
+    status : Optional[Literal["new","processing","completed","failed"]]
 
-def route_meeting(state):
-    if state["already_processed"]:
-        return "already_processed"
+def route_meeting(state: ValidationState):
 
-    return "new_meeting"
+    match state["status"]:
+
+        case "new":
+            return "new_meeting"
+
+        case "completed":
+            return "completed"
+
+        case "failed":
+            return "retry_meeting"
+
+        case "processing":
+            return "retry_meeting"
 
 def generate_hash_node(state: ValidationState):
     sha256 = hashlib.sha256()
@@ -30,10 +39,6 @@ def generate_hash_node(state: ValidationState):
         while chunk := file.read(1024 * 1024):
             sha256.update(chunk)
     
-    meetings = load_processed_meetings()
-    
-    save_processed_meetings(meetings)
-
     return {
         "meeting_hash": sha256.hexdigest()
     }
@@ -53,15 +58,17 @@ def check_processed_node(state: ValidationState):
             None
         )
 
-    if matching_meeting:
+    # Meeting has never been seen before
+    if matching_meeting is None:
         return {
-            "already_processed": True,
-            "video_path": matching_meeting["file_path"],
+            "status": "new",
+            "video_path": state["video_path"],
         }
 
+    # Meeting already exists
     return {
-        "already_processed": False,
-        "video_path": state["video_path"],
+        "status": matching_meeting["status"],
+        "video_path": matching_meeting["file_path"],
     }
     
 def save_new_meeting_node(state: ValidationState):
@@ -74,12 +81,34 @@ def save_new_meeting_node(state: ValidationState):
             "name": Path(state["video_path"]).name,
             "file_path": state["video_path"],
             "hash": state["meeting_hash"],
+            "status": "new",
+            "last_completed_step": None,
         })
 
         save_processed_meetings(meetings)
+    
+    update_meeting_status(
+            state["meeting_hash"],
+            "processing",
+            "validation"
+        )
 
     return {
-        "continue_processing": True
+        "status": "processing",
+        "meeting_hash": state["meeting_hash"],
+    }
+
+def retry_meeting_node(state: ValidationState):
+
+    update_meeting_status(
+        state["meeting_hash"],
+        "processing",
+        "validation"
+    )
+
+    return {
+        "status": "processing",
+        "meeting_hash": state["meeting_hash"],
     }
     
 def already_processed_notification_node(state: ValidationState):
@@ -104,9 +133,7 @@ def already_processed_notification_node(state: ValidationState):
         ]
     )
 
-    return {
-        'continue_processing' : False
-    }
+    return {}
 
 builder = StateGraph(ValidationState)
 
@@ -114,6 +141,7 @@ builder.add_node("generate_hash", generate_hash_node)
 builder.add_node("check_processed", check_processed_node)
 builder.add_node("already_processed_notification", already_processed_notification_node)
 builder.add_node('save_new_meeting',save_new_meeting_node)
+builder.add_node("retry_meeting", retry_meeting_node)
 
 builder.add_edge(START, "generate_hash")
 
@@ -126,8 +154,9 @@ builder.add_conditional_edges(
     "check_processed",
     route_meeting,
     {
-        "already_processed": "already_processed_notification",
-        "new_meeting": 'save_new_meeting',
+        "completed": "already_processed_notification",
+        "new_meeting": "save_new_meeting",
+        "retry_meeting": "retry_meeting",
     }
 )
 
@@ -138,6 +167,11 @@ builder.add_edge(
 
 builder.add_edge(
     "already_processed_notification",
+    END
+)
+
+builder.add_edge(
+    "retry_meeting",
     END
 )
 

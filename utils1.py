@@ -179,4 +179,43 @@ def save_processed_meetings(data: dict) -> None:
     with open(PROCESSED_MEETINGS_FILE, "w", encoding="utf-8") as file:
         json.dump(data, file, indent=4)
 
+def update_meeting_status(
+    meeting_hash: str,
+    status: str,
+    last_completed_step: str | None = None,
+) -> None:
+    """
+    Updates the status and/or last completed step for a meeting.
 
+    Parameters
+    ----------
+    meeting_hash : str
+        SHA-256 hash of the meeting.
+
+    status : str
+        processing / completed / failed
+
+    last_completed_step : str | None
+        Name of the most recently completed node.
+    """
+
+    with meeting_registry_lock:
+
+        meetings = load_processed_meetings()
+
+        for meeting in meetings["meetings"]:
+
+            if meeting["hash"] == meeting_hash:
+
+                meeting["status"] = status
+
+                if last_completed_step is not None:
+                    meeting["last_completed_step"] = last_completed_step
+
+                save_processed_meetings(meetings)
+
+                return
+
+        raise ValueError(
+            f"Meeting with hash '{meeting_hash}' was not found."
+        )

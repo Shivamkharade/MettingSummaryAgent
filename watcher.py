@@ -6,6 +6,8 @@ import threading
 
 # Import your compiled LangGraph
 from Metting_agent import graph
+from utils1 import update_meeting_status
+import hashlib
 
 observer = None
 # WATCH_FOLDER = r"C:\Users\SKharade\Projects and Learning\C_TEST_RECORDING\New folder"
@@ -44,6 +46,16 @@ class MyHandler(FileSystemEventHandler):
         thread.start()
 
 
+def generate_meeting_hash(path: str) -> str:
+
+    sha256 = hashlib.sha256()
+
+    with open(path, "rb") as file:
+        while chunk := file.read(1024 * 1024):
+            sha256.update(chunk)
+
+    return sha256.hexdigest()
+
 def process_file(path: str):
 
     print("=" * 60)
@@ -54,7 +66,9 @@ def process_file(path: str):
     time.sleep(10)
 
     print(f"Running Meeting Agent for:\n{path}")
-
+    
+    meeting_hash = generate_meeting_hash(path)
+    
     try:
 
         graph.invoke(
@@ -66,6 +80,14 @@ def process_file(path: str):
         print(f"\nMeeting completed:\n{path}")
 
     except Exception as e:
+        try:
+            update_meeting_status(
+                meeting_hash,
+                "failed"
+            )
+        except Exception:
+            pass
+
         print(f"\nError while processing meeting:\n{e}")
 
 

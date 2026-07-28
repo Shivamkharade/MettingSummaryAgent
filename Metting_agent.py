@@ -6,24 +6,26 @@ from utils1 import (
     save_text_file,
     extract_text,
     get_llm,
+    update_meeting_status
 )
 from validation_Graph import validation_graph
-from typing import TypedDict,Optional
+from typing import TypedDict,Optional,Literal
 from pathlib import Path
 from win11toast import toast
-
-
 
 class MeetingState(TypedDict):
     video_path: str
     output_dir: str
-    continue_processing: Optional[bool]
+    
+    meeting_hash: Optional[str]
+    status: Optional[Literal["processing", "completed", "failed"]]
+    
     transcript: Optional[str]
     summary: Optional[str]
     action_items: Optional[str]
     
-
 def validation_node(state: MeetingState):
+
     result = validation_graph.invoke(
         {
             "video_path": state["video_path"]
@@ -31,12 +33,14 @@ def validation_node(state: MeetingState):
     )
 
     return {
-        "continue_processing": result["continue_processing"],
-        "video_path": result["video_path"]
+        "video_path": result["video_path"],
+        "meeting_hash": result["meeting_hash"],
+        "status": result["status"],
     }
     
 def route_after_validation(state: MeetingState):
-    if state["continue_processing"]:
+
+    if state["status"] == "processing":
         return "process"
 
     return "stop"
@@ -48,6 +52,12 @@ def transcript_node(state: MeetingState):
         }
     )
     
+    update_meeting_status(
+        state["meeting_hash"],
+        "processing",
+        "transcript"
+    )
+
     return {
         "transcript": result["transcript"]
     }
@@ -101,6 +111,12 @@ def summary_node(state: MeetingState):
     state["video_path"],
     "summary",
     summary
+    )
+    
+    update_meeting_status(
+    state["meeting_hash"],
+    "processing",
+    "summary"
     )
     
     print("exited summary node and saved the summary")
@@ -171,13 +187,18 @@ def action_items(state:MeetingState):
     action_items_text
     )
     
+    update_meeting_status(
+    state["meeting_hash"],
+    "processing",
+    "action_items"
+    )
+    
     print("exited action_items node and saved action items ")
 
     return {
         "action_items": action_items_text
     }
     
-
 def notification_node(state: MeetingState):
 
     output_folder = get_output_directory(state["video_path"])
@@ -200,6 +221,12 @@ def notification_node(state: MeetingState):
         ]
     )
     print("sent the window notification")
+    
+    update_meeting_status(
+    state["meeting_hash"],
+    "completed",
+    "notification"
+    )
     return {}
 
 # graph building
