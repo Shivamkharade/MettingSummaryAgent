@@ -84,8 +84,6 @@ def get_api_key() -> str:
 
     api_key = load_config().get("api_key", "").strip()
 
-    print(f"Loaded API Key: {api_key}")
-
     return api_key
 
 def get_gemini_client():
