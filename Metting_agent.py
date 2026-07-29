@@ -69,7 +69,6 @@ def transcript_node(state: MeetingState):
         "processing",
         "transcript"
     )
-    log("Transcript generated successfully.")
 
     return {
         "transcript": result["transcript"]
@@ -77,8 +76,6 @@ def transcript_node(state: MeetingState):
     
 def summary_node(state: MeetingState):
     set_step("Generating Summary")
-
-    log("Generating meeting summary...")
     
     print("entered summary_node")
     transcript = state["transcript"]
@@ -136,7 +133,6 @@ def summary_node(state: MeetingState):
     )
     
     print("exited summary node and saved the summary")
-    log("Summary generated successfully.")
     return {
         "summary": summary
     }

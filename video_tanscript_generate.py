@@ -148,6 +148,14 @@ def transcript_node(state: TranscriptState):
 
             transcript = response.text
 
+            if transcript is None:
+                raise RuntimeError("Gemini returned no transcript.")
+
+            transcript = transcript.strip()
+
+            if transcript == "":
+                raise RuntimeError("Gemini returned an empty transcript.")
+
             save_text_file(
                 state["video_path"],
                 "transcript",

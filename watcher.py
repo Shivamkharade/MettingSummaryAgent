@@ -91,8 +91,6 @@ def process_file(path: str):
 
         set_meeting("None")
 
-        log("Meeting processed successfully.")
-
     except Exception as e:
         try:
             update_meeting_status(
