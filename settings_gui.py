@@ -1,7 +1,6 @@
 import customtkinter as ctk
 from tkinter import filedialog
 import threading
-
 from watcher import start_watchdog, stop_watchdog
 from utils1 import (
     load_config,
@@ -65,11 +64,9 @@ def update_status(text):
 
     status_value.configure(text=text)
 
-
 def update_meeting(text):
 
     meeting_value.configure(text=text)
-
 
 def update_step(text):
 
