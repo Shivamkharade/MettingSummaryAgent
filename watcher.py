@@ -14,7 +14,6 @@ from gui_manager import (
 )
 
 observer = None
-# WATCH_FOLDER = r"C:\Users\SKharade\Projects and Learning\C_TEST_RECORDING\New folder"
 
 class MyHandler(FileSystemEventHandler):
 
