@@ -6,6 +6,12 @@ import threading
 # Import your compiled LangGraph
 from Metting_agent import graph
 from utils1 import update_meeting_status,generate_meeting_hash
+from gui_manager import (
+    log,
+    set_status,
+    set_meeting,
+    set_step,
+)
 
 observer = None
 # WATCH_FOLDER = r"C:\Users\SKharade\Projects and Learning\C_TEST_RECORDING\New folder"
@@ -35,6 +41,14 @@ class MyHandler(FileSystemEventHandler):
         print(file_path)
         print("=" * 60)
         
+        set_status("Processing")
+
+        set_meeting(file_path.name)
+
+        set_step("Preparing Meeting")
+
+        log(f"New meeting detected: {file_path.name}")
+        
         thread = threading.Thread(
             target=process_file,
             args=(str(file_path),),
@@ -50,9 +64,14 @@ def process_file(path: str):
     print("=" * 60)
 
     print("Waiting 10 seconds for the file to finish copying...")
+    log("Waiting for file copy to complete...")
     time.sleep(10)
+    log("File copy complete.")
 
     print(f"Running Meeting Agent for:\n{path}")
+    set_step("Running Meeting Agent")
+
+    log("Starting Meeting Agent...")    
     
     meeting_hash = generate_meeting_hash(path)
     
@@ -66,6 +85,13 @@ def process_file(path: str):
         )
 
         print(f"\nMeeting completed:\n{path}")
+        set_status("Monitoring")
+
+        set_step("Waiting...")
+
+        set_meeting("None")
+
+        log("Meeting processed successfully.")
 
     except Exception as e:
         try:
@@ -77,12 +103,22 @@ def process_file(path: str):
             pass
 
         print(f"\nError while processing meeting:\n{e}")
+        set_status("Monitoring")
+
+        set_step("Error")
+
+        log(f"Error: {e}")
 
 def start_watchdog(folder_path):
 
     global observer
 
     observer = Observer()
+    set_status("Monitoring")
+
+    set_step("Waiting...")
+
+    log(f"Watching folder: {folder_path}")
 
     observer.schedule(
         MyHandler(),
@@ -102,6 +138,13 @@ def start_watchdog(folder_path):
         observer.stop()
         observer.join()
         print("Monitoring Stopped")
+        set_status("Stopped")
+
+        set_step("Stopped")
+
+        set_meeting("None")
+
+        log("Monitoring stopped.")
 
 def stop_watchdog():
 

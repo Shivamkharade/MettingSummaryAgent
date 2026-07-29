@@ -8,6 +8,10 @@ from utils1 import (
     get_gemini_client,
     Global_model
 )
+from gui_manager import (
+    log,
+    set_step,
+)
 import time
 import operator
 import subprocess
@@ -86,6 +90,9 @@ def route_video(state: TranscriptState) -> str:
 #------------------main nodes------------------#
 
 def transcript_node(state: TranscriptState):
+    set_step("Uploading Video")
+
+    log("Uploading video to Gemini...")
     print("Entered transcript node")
 
     client = get_gemini_client()
@@ -97,6 +104,9 @@ def transcript_node(state: TranscriptState):
     video = client.files.upload(file=video_path)
 
     print("Video uploaded. Waiting for processing...")
+    set_step("Preparing Video")
+
+    log("Waiting for Gemini to prepare the video...")
 
     while True:
         video = client.files.get(name=video.name)
@@ -111,6 +121,7 @@ def transcript_node(state: TranscriptState):
         time.sleep(5)
 
     print("Video is ACTIVE.")
+    log("Video is ready for transcription.")
 
     MAX_RETRIES = 8
     wait_time = 5
@@ -118,7 +129,7 @@ def transcript_node(state: TranscriptState):
     for attempt in range(MAX_RETRIES):
         try:
             print(f"Generating transcript (Attempt {attempt + 1}/{MAX_RETRIES})...")
-
+            set_step("Generating Transcript")
             response = client.models.generate_content(
                 model=Global_model,
                 contents=[
@@ -144,6 +155,7 @@ def transcript_node(state: TranscriptState):
             )
 
             print("Transcript generated successfully.")
+            log("Transcript generated successfully.")
 
             return {
                 "transcript": transcript
@@ -177,6 +189,9 @@ def transcript_node(state: TranscriptState):
             time.sleep(wait_time)
 
 def split_video_node(state: TranscriptState):
+    set_step("Splitting Video")
+
+    log("Long meeting detected. Splitting video into chunks...")
 
     video_path = state["video_path"]
 
@@ -246,6 +261,7 @@ def split_video_node(state: TranscriptState):
         chunk_number += 1
 
     print(f"\nTotal chunks created: {len(chunks)}")
+    log(f"Created {len(chunks)} video chunks.")
 
     return {
         "chunks": chunks
@@ -270,11 +286,13 @@ def fan_out_chunks(state: TranscriptState):
     return sends
 
 def transcribe_chunk_node(state: ChunkWorkerState):
+    set_step("Transcribing Chunks")
     client = get_gemini_client()
     chunk_path = state["chunk_path"]
     chunk_number = state["chunk_number"]
 
     print(f"Uploading Chunk {chunk_number}...")
+    log(f"Uploading chunk {chunk_number}...")
 
     # Upload the chunk
     video_file = client.files.upload(file=chunk_path)
@@ -341,6 +359,7 @@ def transcribe_chunk_node(state: ChunkWorkerState):
         f"Finished Chunk {chunk_number} "
         f"({len(response_text)} characters)"
     )
+    log(f"Chunk {chunk_number} completed.")
 
     return {
         "transcripts": [
@@ -352,6 +371,9 @@ def transcribe_chunk_node(state: ChunkWorkerState):
     }   
 
 def merge_transcripts_node(state: TranscriptState):
+    set_step("Merging Transcript")
+
+    log("Merging transcript chunks...")
 
     ordered = sorted(
         state["transcripts"],
@@ -381,6 +403,7 @@ def merge_transcripts_node(state: TranscriptState):
     )
     
     print("Merged transcript saved.")
+    log("Merged transcript saved successfully.")
     
     return {
         "transcript": transcript

@@ -7,6 +7,10 @@ from utils1 import (
     meeting_registry_lock,
     update_meeting_status
 )
+from gui_manager import (
+    log,
+    set_step,
+)
 from win11toast import toast
 from pathlib import Path
 
@@ -32,6 +36,9 @@ def route_meeting(state: ValidationState):
             return "retry_meeting"
 
 def check_processed_node(state: ValidationState):
+    set_step("Validating Meeting")
+
+    log("Checking meeting history...")
 
     with meeting_registry_lock:
 
@@ -48,6 +55,7 @@ def check_processed_node(state: ValidationState):
 
     # Meeting has never been seen before
     if matching_meeting is None:
+        log("New meeting detected.")
         return {
             "status": "new",
             "video_path": state["video_path"],
@@ -55,6 +63,7 @@ def check_processed_node(state: ValidationState):
         }
 
     # Meeting already exists
+    log(f"Meeting already exists with status: {matching_meeting['status']}")
     return {
         "status": matching_meeting["status"],
         "video_path": matching_meeting["file_path"],
@@ -62,6 +71,7 @@ def check_processed_node(state: ValidationState):
     }
     
 def save_new_meeting_node(state: ValidationState):
+    log("Saving new meeting to registry...")
 
     with meeting_registry_lock:
 
@@ -82,26 +92,32 @@ def save_new_meeting_node(state: ValidationState):
             "processing",
             "validation"
         )
-
+    
+    log("Meeting registered successfully.")
     return {
         "status": "processing",
         "meeting_hash": state["meeting_hash"],
     }
 
 def retry_meeting_node(state: ValidationState):
+    log("Retrying previously incomplete meeting...")
 
     update_meeting_status(
         state["meeting_hash"],
         "processing",
         "validation"
     )
-
+    
+    log("Meeting marked for reprocessing.")
     return {
         "status": "processing",
         "meeting_hash": state["meeting_hash"],
     }
     
 def already_processed_notification_node(state: ValidationState):
+    set_step("Already Processed")
+
+    log("Meeting has already been processed.")
 
     output_folder = get_output_directory(state["video_path"])
 
@@ -122,6 +138,9 @@ def already_processed_notification_node(state: ValidationState):
             }
         ]
     )
+    set_step("Waiting...")
+
+    log("Skipped already processed meeting.")
 
     return {}
 
