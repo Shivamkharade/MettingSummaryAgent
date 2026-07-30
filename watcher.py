@@ -5,7 +5,8 @@ import time
 import threading
 # Import your compiled LangGraph
 from Metting_agent import graph
-from utils1 import update_meeting_status,generate_meeting_hash
+from error_handler import handle_processing_error
+from utils1 import generate_meeting_hash
 from gui_manager import (
     log,
     set_status,
@@ -91,20 +92,11 @@ def process_file(path: str):
         set_meeting("None")
 
     except Exception as e:
-        try:
-            update_meeting_status(
-                meeting_hash,
-                "failed"
-            )
-        except Exception:
-            pass
-
-        print(f"\nError while processing meeting:\n{e}")
-        set_status("Monitoring")
-
-        set_step("Error")
-
-        log(f"Error: {e}")
+        handle_processing_error(
+            meeting_hash=meeting_hash,
+            exception=e,
+            video_path=path
+        )
 
 def start_watchdog(folder_path):
 

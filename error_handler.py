@@ -12,12 +12,11 @@ from utils1 import update_meeting_status
 def handle_processing_error(
     exception: Exception,
     meeting_hash: str | None,
+    video_path: str,
 ):
-    """
-    Handles any exception that occurs 
-    while processing a meeting.
-    """
-    traceback.print_exc()
+    error_trace = traceback.format_exc()
+
+    print(error_trace)
 
     if meeting_hash:
         try:
@@ -32,5 +31,5 @@ def handle_processing_error(
     set_step("Error")
     set_meeting("None")
 
-    log(f"Error: {exception}")
+    log(f"Meeting processing failed: {exception}")
 
