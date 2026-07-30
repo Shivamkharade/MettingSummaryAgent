@@ -53,25 +53,30 @@ def is_long_video(video_path: str, max_duration: int = 3000) -> bool:
 
         Default = 3000 seconds (50 minutes).
     """
+    try:
+        command = [
+            "ffprobe",
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "json",
+            video_path,
+        ]
 
-    command = [
-        "ffprobe",
-        "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "json",
-        video_path,
-    ]
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
 
-    result = subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+        duration = float(json.loads(result.stdout)["format"]["duration"])
 
-    duration = float(json.loads(result.stdout)["format"]["duration"])
-
-    return duration > max_duration
+        return duration > max_duration
+    
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to determine video duration: {e}"
+        ) from e
 
 def route_video(state: TranscriptState) -> str:
     """
@@ -99,27 +104,37 @@ def transcript_node(state: TranscriptState):
     video_path = state["video_path"]
 
     print("Uploading video...")
-
+    
+    try:
     # Upload only once
-    video = client.files.upload(file=video_path)
+        video = client.files.upload(file=video_path)
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to upload video to Gemini: {e}"
+        ) from e 
 
     print("Video uploaded. Waiting for processing...")
     set_step("Preparing Video")
 
     log("Waiting for Gemini to prepare the video...")
+    
+    try:
+        while True:
+            video = client.files.get(name=video.name)
 
-    while True:
-        video = client.files.get(name=video.name)
+            if str(video.state).endswith("ACTIVE"):
+                break
 
-        if str(video.state).endswith("ACTIVE"):
-            break
+            if str(video.state).endswith("FAILED"):
+                raise RuntimeError("Video processing failed.")
 
-        if str(video.state).endswith("FAILED"):
-            raise RuntimeError("Video processing failed.")
-
-        print("Video is processing...")
-        time.sleep(5)
-
+            print("Video is processing...")
+            time.sleep(5)
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed while waiting for Gemini to process video: {e}"
+        ) from e
+        
     print("Video is ACTIVE.")
     log("Video is ready for transcription.")
 
@@ -147,7 +162,7 @@ def transcript_node(state: TranscriptState):
             )
 
             transcript = response.text
-
+            
             if transcript is None:
                 raise RuntimeError("Gemini returned no transcript.")
 
@@ -169,10 +184,12 @@ def transcript_node(state: TranscriptState):
                 "transcript": transcript
             }
 
-        except ServerError as e:
+        except (ServerError,RuntimeError) as e:
             if attempt == MAX_RETRIES - 1:
                 print("Maximum retries reached.")
-                raise
+                raise RuntimeError(
+                     f"Failed to generate transcript after {MAX_RETRIES} attempts: {e}"
+                ) from e
 
             print(
                 f"Server busy (503). Waiting {wait_time} seconds before retry..."
@@ -182,99 +199,93 @@ def transcript_node(state: TranscriptState):
 
             # Exponential backoff
             wait_time *= 2
-        except ServerError as e:
-            if attempt == MAX_RETRIES - 1:
-                print("Maximum retries reached.")
-                raise
-
-            wait_time = 10 * (attempt + 1)
-
-            print(
-                f"Gemini server is busy (503). "
-                f"Retrying in {wait_time} seconds..."
-            )
-
-            time.sleep(wait_time)
 
 def split_video_node(state: TranscriptState):
-    set_step("Splitting Video")
+    
+    try:
+        set_step("Splitting Video")
 
-    log("Long meeting detected. Splitting video into chunks...")
+        log("Long meeting detected. Splitting video into chunks...")
 
-    video_path = state["video_path"]
+        video_path = state["video_path"]
 
-    # Split into 45-minute chunks (2700 seconds)
-    CHUNK_DURATION = 2700
+        # Split into 45-minute chunks (2700 seconds)
+        CHUNK_DURATION = 2700
 
-    # Create the chunks directory inside the meeting output folder
-    meeting_output_dir = get_output_directory(video_path)
+        # Create the chunks directory inside the meeting output folder
+        meeting_output_dir = get_output_directory(video_path)
 
-    chunks_dir = meeting_output_dir / "chunks"
-    chunks_dir.mkdir(parents=True, exist_ok=True)
+        chunks_dir = meeting_output_dir / "chunks"
+        chunks_dir.mkdir(parents=True, exist_ok=True)
 
-    # ------------------------------------
-    # Get video duration using ffprobe
-    # ------------------------------------
-    probe_command = [
-        "ffprobe",
-        "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "json",
-        video_path,
-    ]
-
-    result = subprocess.run(
-        probe_command,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-
-    duration = float(json.loads(result.stdout)["format"]["duration"])
-
-    print(f"Video duration: {duration / 60:.2f} minutes")
-
-    # ------------------------------------
-    # Split the video into chunks
-    # ------------------------------------
-    chunks = []
-
-    chunk_number = 0
-
-    for start_time in range(0, int(duration), CHUNK_DURATION):
-
-        output_file = chunks_dir / f"chunk_{chunk_number:03}.mp4"
-
-        split_command = [
-            "ffmpeg",
-            "-y",
-            "-ss", str(start_time),
-            "-i", video_path,
-            "-t", str(CHUNK_DURATION),
-            "-c", "copy",
-            str(output_file),
+        # ------------------------------------
+        # Get video duration using ffprobe
+        # ------------------------------------
+        probe_command = [
+            "ffprobe",
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "json",
+            video_path,
         ]
 
-        subprocess.run(
-            split_command,
+        result = subprocess.run(
+            probe_command,
+            capture_output=True,
+            text=True,
             check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
         )
 
-        print(f"Created {output_file.name}")
+        duration = float(json.loads(result.stdout)["format"]["duration"])
 
-        chunks.append(str(output_file))
+        print(f"Video duration: {duration / 60:.2f} minutes")
 
-        chunk_number += 1
+        # ------------------------------------
+        # Split the video into chunks
+        # ------------------------------------
+        chunks = []
 
-    print(f"\nTotal chunks created: {len(chunks)}")
-    log(f"Created {len(chunks)} video chunks.")
+        chunk_number = 0
 
-    return {
-        "chunks": chunks
-    }
+        for start_time in range(0, int(duration), CHUNK_DURATION):
 
+            output_file = chunks_dir / f"chunk_{chunk_number:03}.mp4"
+
+            split_command = [
+                "ffmpeg",
+                "-y",
+                "-ss", str(start_time),
+                "-i", video_path,
+                "-t", str(CHUNK_DURATION),
+                "-c", "copy",
+                str(output_file),
+            ]
+
+            subprocess.run(
+                split_command,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+            print(f"Created {output_file.name}")
+
+            chunks.append(str(output_file))
+
+            chunk_number += 1
+
+        print(f"\nTotal chunks created: {len(chunks)}")
+        log(f"Created {len(chunks)} video chunks.")
+
+        return {
+            "chunks": chunks
+        }
+        
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to split video into chunks: {e}"
+        ) from e 
+    
 def fan_out_chunks(state: TranscriptState):
 
     sends = []
@@ -301,9 +312,14 @@ def transcribe_chunk_node(state: ChunkWorkerState):
 
     print(f"Uploading Chunk {chunk_number}...")
     log(f"Uploading chunk {chunk_number}...")
-
-    # Upload the chunk
-    video_file = client.files.upload(file=chunk_path)
+    
+    try:
+        # Upload the chunk
+        video_file = client.files.upload(file=chunk_path)
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to upload chunk {chunk_number}: {e}"
+        ) from e
 
     # Wait until Gemini finishes processing the uploaded file
     while video_file.state.name == "PROCESSING":
@@ -312,12 +328,12 @@ def transcribe_chunk_node(state: ChunkWorkerState):
         video_file = client.files.get(name=video_file.name)
 
     if video_file.state.name == "FAILED":
-        raise Exception(f"Chunk {chunk_number} failed during upload/processing.")
-
+        raise RuntimeError(
+            f"Chunk {chunk_number} failed during processing."
+            )
+        
     print(f"Generating transcript for Chunk {chunk_number}...")
     
-    
-
     # Generate transcript
     MAX_RETRIES = 3
 
@@ -352,7 +368,9 @@ def transcribe_chunk_node(state: ChunkWorkerState):
 
         except (ServerError,RuntimeError) as e:
             if attempt == MAX_RETRIES - 1:
-                raise
+                raise RuntimeError(
+                    f"Chunk {chunk_number} transcription failed after {MAX_RETRIES} attempts: {e}"
+                ) from e
 
             wait_time = 10 * (attempt + 1)
 
@@ -382,40 +400,45 @@ def merge_transcripts_node(state: TranscriptState):
     set_step("Merging Transcript")
 
     log("Merging transcript chunks...")
-
-    ordered = sorted(
-        state["transcripts"],
-        key=lambda item: item["chunk_number"]
-    )
-
-    missing = [
-        item["chunk_number"]
-        for item in ordered
-        if not item["transcript"]
-    ]
-
-    if missing:
-        raise RuntimeError(
-            f"Missing transcript(s) for chunk(s): {missing}"
+    
+    try:
+        ordered = sorted(
+            state["transcripts"],
+            key=lambda item: item["chunk_number"]
         )
 
-    transcript = "\n\n".join(
-        item["transcript"]
-        for item in ordered
-    )
-    
-    save_text_file(
-        state['video_path'],
-        "transcript",
-        transcript
-    )
-    
-    print("Merged transcript saved.")
-    log("Merged transcript saved successfully.")
-    
-    return {
-        "transcript": transcript
-    }
+        missing = [
+            item["chunk_number"]
+            for item in ordered
+            if not item["transcript"]
+        ]
+
+        if missing:
+            raise RuntimeError(
+                f"Missing transcript(s) for chunk(s): {missing}"
+            )
+
+        transcript = "\n\n".join(
+            item["transcript"]
+            for item in ordered
+        )
+        
+        save_text_file(
+            state['video_path'],
+            "transcript",
+            transcript
+        )
+        
+        print("Merged transcript saved.")
+        log("Merged transcript saved successfully.")
+        
+        return {
+            "transcript": transcript
+        }
+    except Exception as e:
+        raise RuntimeError (
+            f"Failed to merge transcript chunks: {e}"
+        ) from e 
 
 transcript_builder = StateGraph(TranscriptState)
 
