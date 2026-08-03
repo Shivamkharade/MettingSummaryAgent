@@ -2,6 +2,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from pathlib import Path
 import time
+import traceback
 import threading
 # Import your compiled LangGraph
 from Metting_agent import graph
@@ -92,11 +93,14 @@ def process_file(path: str):
         set_meeting("None")
 
     except Exception as e:
-        handle_processing_error(
-            meeting_hash=meeting_hash,
-            exception=e,
-            video_path=path
-        )
+        try:
+            handle_processing_error(
+                meeting_hash=meeting_hash,
+                video_path=path,
+                exception=e
+            )
+        except Exception:
+            traceback.print_exc()
 
 def start_watchdog(folder_path):
 
