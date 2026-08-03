@@ -110,6 +110,13 @@ def save_text_file(video_path: str, filename: str, content: Any) -> Path:
         filename += ".pdf"
 
     file_path = output_folder / filename
+    
+    restore_folder = output_folder / "restore"
+
+    restore_folder.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
     # Convert different content types to text
     if isinstance(content, str):
@@ -131,6 +138,13 @@ def save_text_file(video_path: str, filename: str, content: Any) -> Path:
 
     else:
         text = str(content)
+    
+    restore_file = restore_folder / f"{Path(filename).stem}.txt"
+
+    restore_file.write_text(
+        text,
+        encoding="utf-8"
+    )
 
     # Create PDF
     doc = SimpleDocTemplate(str(file_path))
@@ -228,3 +242,23 @@ def generate_meeting_hash(path: str) -> str:
             sha256.update(chunk)
 
     return sha256.hexdigest()
+
+def load_text_file(
+    video_path: str,
+    file_name: str,
+) -> str:
+    output_directory = get_output_directory(video_path)
+
+    restore_folder = output_directory / "restore"
+
+    file_path = restore_folder / f"{file_name}.txt"
+
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"Missing required file: {file_path}"
+        )
+
+    return file_path.read_text(
+        encoding="utf-8"
+    )
+    

@@ -6,7 +6,8 @@ from utils1 import (
     save_text_file,
     extract_text,
     get_llm,
-    update_meeting_status
+    update_meeting_status,
+    load_text_file
 )
 from gui_manager import (
     log,
@@ -24,6 +25,7 @@ class MeetingState(TypedDict):
     
     meeting_hash: Optional[str]
     status: Optional[Literal["processing", "completed", "failed"]]
+    last_completed_step: Optional[str]
     
     transcript: Optional[str]
     summary: Optional[str]
@@ -47,19 +49,86 @@ def validation_node(state: MeetingState):
             "video_path": result["video_path"],
             "meeting_hash": result["meeting_hash"],
             "status": result["status"],
+            "last_completed_step": result["last_completed_step"]
         }
     except Exception as e:
         raise RuntimeError(
             f"Validation graph failed: {e}"
         ) from e
+
+def restore_state_node(state: MeetingState):
+    """
+    Restores previously generated outputs so the graph
+    can resume from the last completed step.
+    """
+
+    log("Restoring meeting state...")
+
+    restored_state = {}
+
+    # Nothing exists yet
+    if state["last_completed_step"] == "validation":
+        return restored_state
+
+    # Transcript already exists
+    if state["last_completed_step"] in (
+        "transcript",
+        "summary",
+        "action_items",
+        "notification",
+    ):
+        restored_state["transcript"] = load_text_file(
+            state["video_path"],
+            "transcript",
+        )
+
+    # Summary already exists
+    if state["last_completed_step"] in (
+        "summary",
+        "action_items",
+        "notification",
+    ):
+        restored_state["summary"] = load_text_file(
+            state["video_path"],
+            "summary",
+        )
+
+    # Action items already exist
+    if state["last_completed_step"] in (
+        "action_items",
+        "notification",
+    ):
+        restored_state["action_items"] = load_text_file(
+            state["video_path"],
+            "action_items",
+        )
+
+    log("Previous meeting state restored.")
+
+    return restored_state
     
 def route_after_validation(state: MeetingState):
 
-    if state["status"] == "processing":
-        return "process"
+    if state["status"] != "processing":
+        return "stop"
 
-    return "stop"
+    match state["last_completed_step"]:
 
+        case "validation":
+            return "transcript"
+
+        case "transcript":
+            return "summary"
+
+        case "summary":
+            return "action_items"
+
+        case "action_items":
+            return "notification"
+
+        case _:
+            return "transcript"
+        
 def transcript_node(state: MeetingState):
     set_step("Generating Transcript")
 
@@ -89,6 +158,8 @@ def transcript_node(state: MeetingState):
     
 def summary_node(state: MeetingState):
     set_step("Generating Summary")
+    
+    log("Extracting Summary...")
     
     try:
         print("entered summary_node")
@@ -147,6 +218,7 @@ def summary_node(state: MeetingState):
         )
         
         print("exited summary node and saved the summary")
+        log("Summary generated successfully.")
         return {
             "summary": summary
         }
@@ -271,7 +343,7 @@ def notification_node(state: MeetingState):
         update_meeting_status(
         state["meeting_hash"],
         "completed",
-        "notification"
+        "completed"
         )
         set_step("Waiting...")
 
@@ -289,28 +361,34 @@ builder = StateGraph(MeetingState)
 
 # adding nodes
 builder.add_node("validation", validation_node)
+builder.add_node("restore_state",restore_state_node,)
 builder.add_node('transcript',transcript_node)
 builder.add_node('summary',summary_node)
 builder.add_node('action_items',action_items)
 builder.add_node('notification',notification_node)
 
 # adding edges
-builder.add_edge(START, "validation")
+builder.add_edge(START,"validation",)
+
+builder.add_edge("validation","restore_state",)
 
 builder.add_conditional_edges(
-    "validation",
+    "restore_state",
     route_after_validation,
     {
-        "process": "transcript",
+        "transcript": "transcript",
+        "summary": "summary",
+        "action_items": "action_items",
+        "notification": "notification",
         "stop": END,
     }
 )
 
-builder.add_edge("transcript", "summary")
-builder.add_edge("transcript", "action_items")
+builder.add_edge("transcript","summary",)
 
-builder.add_edge("summary", "notification")
-builder.add_edge("action_items", "notification")
+builder.add_edge("summary","action_items",)
+
+builder.add_edge("action_items","notification",)
 
 builder.add_edge("notification", END)
 

@@ -18,6 +18,7 @@ class ValidationState(TypedDict):
     video_path: str
     meeting_hash: Optional[str]
     status : Optional[Literal["new","processing","completed","failed"]]
+    last_completed_step: Optional[str]
 
 def route_meeting(state: ValidationState):
 
@@ -67,6 +68,7 @@ def check_processed_node(state: ValidationState):
                 "status": "new",
                 "video_path": state["video_path"],
                 "meeting_hash": state["meeting_hash"],
+                "last_completed_step":None
             }
 
         # Meeting already exists
@@ -75,6 +77,7 @@ def check_processed_node(state: ValidationState):
             "status": matching_meeting["status"],
             "video_path": matching_meeting["file_path"],
             "meeting_hash": state["meeting_hash"],
+            "last_completed_step":matching_meeting["last_completed_step"]
         }
     
     except Exception as e:
@@ -111,6 +114,7 @@ def save_new_meeting_node(state: ValidationState):
         return {
             "status": "processing",
             "meeting_hash": state["meeting_hash"],
+            "last_completed_step":"validation"
         }
     
     except Exception as e:
@@ -125,13 +129,13 @@ def retry_meeting_node(state: ValidationState):
         update_meeting_status(
             state["meeting_hash"],
             "processing",
-            "validation"
         )
         
         log("Meeting marked for reprocessing.")
         return {
             "status": "processing",
             "meeting_hash": state["meeting_hash"],
+            "last_completed_step": state["last_completed_step"]
         }
     except Exception as e:
         raise RuntimeError(
