@@ -23,6 +23,9 @@ Built using **Python**, **LangGraph**, **LangChain**, **Google Gemini**, **Custo
 - 📁 Automatic meeting-specific output folders
 - ⚙️ Persistent configuration
 - 🧵 Multi-threaded processing
+- 🛡️ Centralized exception handling
+- 📄 Automatic error.log generation for failed meetings
+- 🔍 Chained exception tracing for easier debugging
 
 ---
 
@@ -67,6 +70,9 @@ Already Processed?                 Split if Required
                   └─────────────────────────┬────────────────────┘
                                             ▼
                                    Desktop Notification
+                                            │
+                                            ▼
+                                  Centralized Error Handler
                                             ▼
                                            END
 ```
@@ -147,6 +153,41 @@ This ensures partially processed meetings are resumed instead of being treated a
 
 ---
 
+# 🛡️ Error Handling
+
+The application uses a centralized exception handling system designed to make debugging and recovery easier.
+
+Every workflow node raises meaningful exceptions, which are propagated through the LangGraph workflow using Python's exception chaining (`raise ... from e`).
+
+When a failure occurs, the application automatically:
+
+- Captures the complete traceback
+- Preserves the entire exception chain
+- Marks the meeting as **failed**
+- Resets the application state
+- Generates an `error.log` file inside the meeting output folder
+- Allows failed meetings to be retried automatically
+
+Example exception flow:
+
+```text
+Gemini Server Error
+        │
+        ▼
+Transcript Node
+        │
+        ▼
+Transcript Graph
+        │
+        ▼
+Meeting Graph
+        │
+        ▼
+Centralized Error Handler
+```
+
+---
+
 # 🎥 Transcript Workflow
 
 The application automatically determines whether a meeting is **short** or **long**.
@@ -208,11 +249,12 @@ Long recordings are processed significantly faster by transcribing multiple chun
 
 ```text
 AI-Meeting-Assistant/
-│
+
 ├── Meeting_agent.py
 ├── validation_graph.py
 ├── video_transcript_generate.py
 ├── watcher.py
+├── error_handler.py
 ├── settings_gui.py
 ├── utils1.py
 │
@@ -378,10 +420,11 @@ No manual intervention is required.
 ```text
 Output/
 
-├── Sprint Planning/
-│   ├── transcript.pdf
-│   ├── summary.pdf
-│   ├── action_items.pdf
+Sprint Planning/
+├── transcript.pdf
+├── summary.pdf
+├── action_items.pdf
+├── error.log
 │
 ├── Client Meeting/
 │   ├── transcript.pdf
@@ -410,6 +453,10 @@ The application includes:
 - Exponential backoff
 - Parallel chunk transcription
 - Ordered transcript merging
+- Centralized exception handling
+- Exception chaining using `raise ... from e`
+- Automatic error log generation
+- Graceful recovery after processing failures
 
 ---
 
