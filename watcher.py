@@ -4,10 +4,13 @@ from pathlib import Path
 import time
 import traceback
 import threading
-# Import your compiled LangGraph
 from Metting_agent import graph
 from error_handler import handle_processing_error
-from utils1 import generate_meeting_hash
+from utils1 import (
+    generate_meeting_hash,
+    load_processed_meetings,
+    meeting_registry_lock
+)
 from gui_manager import (
     log,
     set_status,
@@ -18,45 +21,72 @@ from gui_manager import (
 observer = None
 
 class MyHandler(FileSystemEventHandler):
+    
+    last_seen = {}
 
-    def on_created(self, event):
+    def handle_file(self, path: str):
 
-        # Ignore folders
-        if event.is_directory:
+        file_path = Path(path)
+
+        if file_path.is_dir():
             return
 
-        file_path = Path(event.src_path)
-
-        # Process only meeting recordings
-        if file_path.suffix.lower() not in [
+        if file_path.suffix.lower() not in {
             ".mp4",
             ".wav",
             ".mp3",
             ".mkv",
-            ".mov"
-        ]:
+            ".mov",
+        }:
             return
+        
+        now = time.time()
+        
+        previous = self.last_seen.get(file_path,0)
+        
+        if now - previous < 10:
+            return
+        
+        self.last_seen[file_path] = now
 
         print("=" * 60)
-        print("New meeting detected")
+        print("Meeting detected")
         print(file_path)
         print("=" * 60)
-        
+
         set_status("Processing")
-
         set_meeting(file_path.name)
-
         set_step("Preparing Meeting")
 
-        log(f"New meeting detected: {file_path.name}")
-        
+        log(f"Meeting detected: {file_path.name}")
+
         thread = threading.Thread(
             target=process_file,
             args=(str(file_path),),
-            daemon=True
+            daemon=True,
         )
-
         thread.start()
+    
+    def on_created(self, event):
+
+        if event.is_directory:
+            return
+
+        self.handle_file(event.src_path)
+    
+    def on_moved(self, event):
+
+        if event.is_directory:
+            return
+
+        self.handle_file(event.dest_path)
+    
+    def on_modified(self, event):
+
+        if event.is_directory:
+            return
+
+        self.handle_file(event.src_path)
 
 def process_file(path: str):
 

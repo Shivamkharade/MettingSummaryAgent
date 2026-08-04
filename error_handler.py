@@ -23,7 +23,14 @@ def save_error_log(
 
     output_folder = get_output_directory(video_path)
 
-    error_log = output_folder / "error.log"
+    restore_folder = output_folder / "restore"
+
+    restore_folder.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    error_log = restore_folder / "error.log"
 
     with open(error_log, "a", encoding="utf-8") as file:
         file.write("=" * 80 + "\n")
@@ -32,7 +39,6 @@ def save_error_log(
         file.write(error_trace)
         file.write("\n\n")
 
-# add all the execption handling here tomarow
 def handle_processing_error(
     exception: Exception,
     meeting_hash: str | None,
