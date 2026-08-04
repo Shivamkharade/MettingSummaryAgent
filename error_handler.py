@@ -1,6 +1,7 @@
 import traceback
 from pathlib import Path
 from datetime import datetime
+from win11toast import toast
 from utils1 import (
     update_meeting_status,
     get_output_directory
@@ -79,3 +80,14 @@ def handle_processing_error(
 
     # GUI log
     log(f"Meeting processing failed: {exception}")
+    
+    try:
+        toast(
+            "❌ AI Meeting Assistant",
+            f"{Path(video_path).name}\n\n"
+            f"Error: {str(exception)}"
+        )
+    except Exception:
+        pass
+    
+    log("See restore/error.log for the full traceback.")
