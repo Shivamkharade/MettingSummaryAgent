@@ -214,6 +214,8 @@ The application is composed of three independent LangGraph workflows.
 
 Separating the application into multiple graphs keeps responsibilities isolated, improves maintainability, and simplifies future extensions.
 
+---
+
 # 🛡️ Error Handling
 
 The application uses a centralized exception handling system designed to make debugging and recovery easier.
