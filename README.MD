@@ -46,63 +46,57 @@ Built using **Python**, **LangGraph**, **LangChain**, **Google Gemini**, **Custo
                  Generate SHA-256 Hash
                            │
                            ▼
-                 Main LangGraph Workflow
+                  Main Meeting Graph
                            │
-          ┌────────────────┴────────────────┐
-          ▼                                 ▼
- Validation Graph                  Transcript Graph
-          │                                 │
-          ▼                                 ▼
-Duplicate Check                 Short / Long Meeting
-          │                                 │
-          ▼                                 ▼
-Already Processed?                 Split if Required
-          │                                 │
-          ▼                                 ▼
-     Stop Processing          Parallel Chunk Transcription
-                                            │
-                                            ▼
-                                   Merge Transcript
-                                            │
-                  ┌─────────────────────────┴────────────────────┐
-                  ▼                                              ▼
-          Summary Generator                           Action Item Generator
-                  └─────────────────────────┬────────────────────┘
-                                            ▼
-                                   Desktop Notification
-                                            │
-                                            ▼
-                                  Centralized Error Handler
-                                            ▼
-                                           END
+                           ▼
+                  Validation Graph
+                           │
+                           ▼
+           New / Retry / Completed Meeting
+                           │
+                           ▼
+                  Restore Previous State
+                           │
+         ┌─────────────────┼─────────────────┐
+         ▼                 ▼                 ▼
+   Transcript Graph     Summary        Action Items
+         │                                   │
+         └─────────────────┬─────────────────┘
+                           ▼
+                 Windows Notification
+                           │
+                           ▼
+              Centralized Error Handler
+                           │
+                           ▼
+                          END
 ```
 
 ---
 
-# 🔄 Workflow
+# 🔄 Main Workflow
 
 ```text
 START
    │
-Validation
-   │
-   ├──────── Already Processed ───────► END
+   ▼
+Validation Graph
    │
    ▼
-Transcript Generation
+Restore Previous State
    │
-   ├─────────────┐
-   ▼             ▼
-Summary     Action Items
-      \       /
-       \     /
-     Notification
-          │
-          ▼
-         END
+   ├──────────────► Transcript
+   │
+   ├──────────────► Summary
+   │
+   ├──────────────► Action Items
+   │
+   └──────────────► Notification
+           │
+           ▼
+          END
 ```
-
----
+The application resumes processing from the last successfully completed workflow step instead of restarting the entire pipeline.
 
 # ✅ Validation Workflow
 
@@ -119,25 +113,25 @@ The application maintains a persistent registry (`processed_meetings.json`) cont
 ## Meeting Lifecycle
 
 ```text
-new
- │
- ▼
+New Meeting
+      │
+      ▼
 processing (validation)
- │
- ▼
+      │
+      ▼
 processing (transcript)
- │
- ▼
+      │
+      ▼
 processing (summary)
- │
- ▼
+      │
+      ▼
 processing (action_items)
- │
- ▼
+      │
+      ▼
 completed
 ```
 
-If the application crashes during processing:
+If processing is interrupted:
 
 ```text
 processing
@@ -146,12 +140,79 @@ processing
 failed
       │
       ▼
-Automatic Retry
+Restore Previous State
+      │
+      ▼
+Resume Processing
+```
+---
+
+# ♻️ Workflow Restoration
+
+The application supports automatic workflow restoration after interruptions.
+
+Instead of regenerating every AI artifact, previously generated outputs are restored from disk using the `last_completed_step` stored in the meeting registry.
+
+This allows the workflow to resume from exactly where it stopped.
+
+Example:
+
+```text
+Validation
+      │
+      ▼
+Transcript Generated
+      │
+      ▼
+Summary Generated
+      │
+      ▼
+Application Closed
+      │
+      ▼
+Restart
+      │
+      ▼
+Restore Transcript
+Restore Summary
+      │
+      ▼
+Generate Action Items
+      │
+      ▼
+Notification
 ```
 
-This ensures partially processed meetings are resumed instead of being treated as duplicates.
+Previously completed AI tasks are never regenerated unnecessarily, reducing API usage and processing time.
 
 ---
+# 🧩 LangGraph Architecture
+
+The application is composed of three independent LangGraph workflows.
+
+```text
+                 Main Meeting Graph
+                        │
+                        ▼
+                Validation Graph
+                        │
+                        ▼
+                Restore State Node
+                        │
+                        ▼
+               Transcript Graph
+                        │
+                        ▼
+                  Summary Node
+                        │
+                        ▼
+               Action Items Node
+                        │
+                        ▼
+               Notification Node
+```
+
+Separating the application into multiple graphs keeps responsibilities isolated, improves maintainability, and simplifies future extensions.
 
 # 🛡️ Error Handling
 
@@ -188,9 +249,9 @@ Centralized Error Handler
 
 ---
 
-# 🎥 Transcript Workflow
+# 🎥 Transcript Graph
 
-The application automatically determines whether a meeting is **short** or **long**.
+Transcript generation is handled by a dedicated LangGraph workflow.
 
 ## Short Meetings
 
@@ -198,11 +259,13 @@ The application automatically determines whether a meeting is **short** or **lon
 Video
    │
    ▼
-Gemini
+Upload to Gemini
    │
    ▼
-Transcript
+Generate Transcript
 ```
+
+---
 
 ## Long Meetings
 
@@ -210,22 +273,24 @@ Transcript
 Video
    │
    ▼
-Split into 45-minute chunks
+Split into 45-minute Chunks
    │
    ▼
-Fan-Out
-   │
-   ▼
-Parallel Gemini Transcription
-   │
-   ▼
-Merge
-   │
-   ▼
-Final Transcript
+          Fan-Out
+   ┌────────┼────────┐
+   ▼        ▼        ▼
+Chunk 1  Chunk 2  Chunk 3
+   │        │        │
+Gemini   Gemini   Gemini
+   ▼        ▼        ▼
+   └────────┼────────┘
+            ▼
+     Merge Transcript
+            ▼
+     Final Transcript
 ```
 
-Long recordings are processed significantly faster by transcribing multiple chunks simultaneously.
+Large meetings are processed significantly faster by transcribing multiple chunks in parallel before merging them into a single transcript.
 
 ---
 
@@ -421,22 +486,21 @@ No manual intervention is required.
 Output/
 
 Sprint Planning/
+
 ├── transcript.pdf
 ├── summary.pdf
 ├── action_items.pdf
-├── error.log
 │
-├── Client Meeting/
-│   ├── transcript.pdf
-│   ├── summary.pdf
-│   ├── action_items.pdf
-│   └── chunks/
+├── restore/
+│   ├── transcript.txt
+│   ├── summary.txt
+│   ├── action_items.txt
+│   └── error.log
 │
-└── Team Sync/
-    ├── transcript.pdf
-    ├── summary.pdf
-    └── action_items.pdf
+└── chunks/
 ```
+
+The `restore` directory stores intermediate workflow outputs, allowing interrupted meetings to resume without regenerating completed AI tasks.
 
 ---
 
@@ -446,6 +510,8 @@ The application includes:
 
 - SHA-256 duplicate detection
 - Meeting lifecycle tracking
+- Automatic workflow restoration
+- Restore previous workflow state
 - Automatic retry of failed meetings
 - Thread-safe registry updates
 - Multi-threaded meeting processing
